@@ -51,7 +51,6 @@ workflows:
             branches:
               ignore:
                 - master
-      - docker-build
       - publish:
           filters:
             branches:
