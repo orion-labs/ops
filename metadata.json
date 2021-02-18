@@ -1,0 +1,51 @@
+{
+  "name": "devenv",
+  "version": "0.1.0",
+  "package": "github.com/onbeep/devenv",
+  "description": "Easily manage orion-ptt-system instances",
+  "repository": "https://orionlabs-dbt-tools.s3.us-east-1.amazonaws.com",
+  "building": {
+    "targets": [
+      {
+        "name": "darwin/amd64"
+      },
+      {
+        "name": "linux/amd64"
+      }
+    ],
+    "extras": [
+      {
+        "template": "templates/description.tmpl",
+        "filename": "description.txt",
+        "executable": false
+      }
+    ]
+  },
+  "signing": {
+    "program": "gpg",
+    "email": "obci@orionlabs.io"
+
+  },
+  "publishing": {
+    "targets": [
+      {
+        "src": "description.txt",
+        "dst": "{{.Repository}}/{{.Name}}/{{.Version}}/description.txt",
+        "sig": true,
+        "checksums": true
+      },
+      {
+        "src": "devenv_darwin_amd64",
+        "dst": "{{.Repository}}/{{.Name}}/{{.Version}}/darwin/amd64/{{.Name}}",
+        "sig": true,
+        "checksums": true
+      },
+      {
+        "src": "devenv_linux_amd64",
+        "dst": "{{.Repository}}/{{.Name}}/{{.Version}}/linux/amd64/{{.Name}}",
+        "sig": true,
+        "checksums": true
+      }
+    ]
+  }
+}
