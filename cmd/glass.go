@@ -25,14 +25,18 @@ import (
 // glassCmd represents the glass command
 var glassCmd = &cobra.Command{
 	Use:   "glass",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Nuke and pave an environment (destroy, then recreate).",
+	Long: `
+Nuke and pave an environment (destroy, then recreate).
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if name == "" {
+			if len(args) > 0 {
+				name = args[0]
+			}
+		}
+
 		err := devenv.Glass(name)
 		if err != nil {
 			log.Fatalf("Error running glass: %s", err)
