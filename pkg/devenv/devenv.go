@@ -5,15 +5,18 @@ import (
 )
 
 func Create(name string) (err error) {
+	err = errors.New("Create not yet implemented!")
 	return err
 }
 
 func Destroy(name string) (err error) {
+	err = errors.New("Destroy not yet implemented!")
 
 	return err
 }
 
 func List() (err error) {
+	err = errors.New("List not yet implemented!")
 
 	return err
 }
