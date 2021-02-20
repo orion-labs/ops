@@ -33,3 +33,12 @@ func setUp() {
 func tearDown() {
 
 }
+
+func TestStackTemplate(t *testing.T) {
+	output, err := StackTemplate("foo", "bar")
+	if err != nil {
+		t.Errorf("Failed rendering template: %s", err)
+	}
+
+	fmt.Printf("Rendered template:\n%s", output)
+}
