@@ -97,6 +97,7 @@ Create a dev env by name.
 		defer cancel()
 
 		statusDone := false
+		rollback := false
 
 		for {
 			select {
@@ -115,6 +116,12 @@ Create a dev env by name.
 					break
 				}
 
+				if status == "ROLLBACK_COMPLETE" {
+					statusDone = true
+					rollback = true
+					break
+				}
+
 			case <-ctx.Done():
 				log.Fatalf("Stack Creation Timeout exceeded\n")
 			}
@@ -122,6 +129,54 @@ Create a dev env by name.
 			if statusDone {
 				break
 			}
+		}
+
+		if rollback {
+			fmt.Printf("Create failed.  Deleting Stack %q.\n", name)
+			err = d.Destroy()
+			if err != nil {
+				log.Fatalf("failed destroying stack %s: %s", name, err)
+			}
+
+			start := time.Now()
+
+			fmt.Printf("Checking Status\n")
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			statusDone := false
+
+			for {
+				select {
+				case <-time.After(10 * time.Second):
+					status, err := d.Status()
+					// we don't fail the test if there's an error, cos when the stack is truly deleted, we'll error out when we try to check the status.
+					if err != nil {
+						fmt.Printf("  DELETE_COMPLETE\n")
+						statusDone = true
+						break
+					}
+
+					ts := time.Now()
+					h, m, s := ts.Clock()
+					fmt.Printf("  %02d:%02d:%02d %s\n", h, m, s, status)
+
+				case <-ctx.Done():
+					log.Fatalf("Stack Deletion Timeout exceeded\n")
+				}
+
+				if statusDone {
+					break
+				}
+			}
+
+			finish := time.Now()
+
+			dur := finish.Sub(start)
+			fmt.Printf("Stack Deletion took %f minutes.\n", dur.Minutes())
+
+			os.Exit(0)
 		}
 
 		finish := time.Now()
