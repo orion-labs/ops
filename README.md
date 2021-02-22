@@ -2,15 +2,19 @@
 
 Easily manage orion-ptt-system instances.
 
-## Create a Stack
+## Create a Dev Environment
 
     [dbt] devenv create <name>
 
-## Destroy a Stack
+## Destroy a Dev Environment
 
     [dbt] devenv destroy <name>
 
-## Glass a Stack (Nuke and Pave)
+## Display Status of a Dev Environment
+
+    [dbt] devenv status <name>
+
+## Glass a Dev Environment (Nuke and Pave)
 
     [dbt] devenv glass <name>
 

@@ -16,10 +16,13 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/onbeep/devenv/pkg/devenv"
 	"github.com/spf13/cobra"
 	"log"
+	"os"
+	"strings"
 )
 
 // statusCmd represents the status command
@@ -30,6 +33,26 @@ var statusCmd = &cobra.Command{
 Show status of a dev env by name.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		if name == "" {
+			if len(args) > 0 {
+				name = args[0]
+			}
+		}
+
+		if name == "" {
+			fmt.Println("\nPlease enter stack name:")
+			fmt.Println()
+			var n string
+
+			reader := bufio.NewReader(os.Stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				log.Fatal("failed to read response")
+			}
+
+			n = strings.TrimRight(input, "\n")
+			keyname = n
+		}
 		d, err := devenv.NewDevEnv(name, keyname, nil)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
