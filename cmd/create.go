@@ -198,7 +198,7 @@ Create a dev env by name.
 
 		w.Flush()
 
-		fmt.Printf("\nNB: Even though the stack is created, it takes a few minutes to install the components.  The above URL's won't be available until kotsadm is ready, and you install your license.\n\n")
+		fmt.Printf("\nNB: Even though the stack is created, it takes a few minutes to install Kubernetes and kotsadm.  The above URL's won't be available until kotsadm is ready, and you install your license.\n\n")
 	},
 }
 
