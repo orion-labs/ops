@@ -98,7 +98,7 @@ Nuke and pave an environment (destroy, then recreate).
 			k = strings.TrimRight(input, "\n")
 			d.KeyName = k
 		} else {
-			fmt.Printf("Using KeyPair: %s\n", d.KeyName)
+			fmt.Printf("Using KeyPair: %q\n", d.KeyName)
 		}
 
 		fmt.Printf("Deleting Stack %q.\n", name)
@@ -253,9 +253,9 @@ Nuke and pave an environment (destroy, then recreate).
 			log.Fatalf("Error fetching Stack Outputs: %s", err)
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
 		for _, o := range outputs {
-			fmt.Fprintf(w, "  %s \t %s\n", *o.OutputKey, *o.OutputValue)
+			fmt.Fprintf(w, "  %s: \t %s\n", *o.OutputKey, *o.OutputValue)
 		}
 
 		w.Flush()
