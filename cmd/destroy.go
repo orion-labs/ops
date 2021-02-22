@@ -16,8 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
+	"context"
+	"fmt"
 	"github.com/onbeep/devenv/pkg/devenv"
 	"log"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -36,10 +42,69 @@ Destroy a dev env by name.
 			}
 		}
 
-		err := devenv.Destroy(name)
-		if err != nil {
-			log.Fatalf("Error running create: %s", err)
+		if name == "" {
+			fmt.Println("\nPlease enter stack name:")
+			fmt.Println()
+			var n string
+
+			reader := bufio.NewReader(os.Stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				log.Fatal("failed to read response")
+			}
+
+			n = strings.TrimRight(input, "\n")
+			keyname = n
 		}
+
+		d, err := devenv.NewDevEnv(name, keyname, nil)
+		if err != nil {
+			log.Fatalf("Failed to create devenv object: %s", err)
+		}
+
+		fmt.Printf("Deleting Stack %q.\n", name)
+		err = d.Destroy()
+		if err != nil {
+			log.Fatalf("failed destroying stack %s: %s", name, err)
+		}
+
+		start := time.Now()
+
+		fmt.Printf("Checking Status\n")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+
+		statusDone := false
+
+		for {
+			select {
+			case <-time.After(10 * time.Second):
+				status, err := d.Status()
+				// we don't fail the test if there's an error, cos when the stack is truly deleted, we'll error out when we try to check the status.
+				if err != nil {
+					fmt.Printf("  DELETE_COMPLETE\n")
+					statusDone = true
+					break
+				}
+
+				ts := time.Now()
+				h, m, s := ts.Clock()
+				fmt.Printf("  %02d:%02d:%02d %s\n", h, m, s, status)
+
+			case <-ctx.Done():
+				log.Fatalf("Stack Deletion Timeout exceeded\n")
+			}
+
+			if statusDone {
+				break
+			}
+		}
+
+		finish := time.Now()
+
+		dur := finish.Sub(start)
+		fmt.Printf("Stack Deletion took %f minutes.\n", dur.Minutes())
 	},
 }
 

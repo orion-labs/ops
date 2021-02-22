@@ -20,6 +20,7 @@ import (
 )
 
 var name string
+var keyname string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -44,4 +45,5 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&name, "name", "n", "", "environment name")
+	rootCmd.PersistentFlags().StringVarP(&keyname, "keyname", "k", "", "ssh key name")
 }

@@ -1,13 +1,18 @@
 package devenv
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/onbeep/awslibs/pkg/awslibs"
+	"github.com/stretchr/testify/assert"
+	"log"
 	"os"
 	"testing"
+	"time"
 )
 
-var tmpDir string
+var awssession *session.Session
 
 func TestMain(m *testing.M) {
 	setUp()
@@ -20,13 +25,15 @@ func TestMain(m *testing.M) {
 }
 
 func setUp() {
-	dir, err := ioutil.TempDir("", "devenv")
-	if err != nil {
-		fmt.Printf("Error creating temp dir %q: %s\n", tmpDir, err)
-		os.Exit(1)
-	}
 
-	tmpDir = dir
+	if awssession == nil {
+		sess, err := awslibs.DefaultSession()
+		if err != nil {
+			log.Fatalf("failed creating aws session: %s", err)
+		}
+
+		awssession = sess
+	}
 
 }
 
@@ -34,11 +41,141 @@ func tearDown() {
 
 }
 
-func TestStackTemplate(t *testing.T) {
-	output, err := StackTemplate("foo", "bar")
-	if err != nil {
-		t.Errorf("Failed rendering template: %s", err)
+func TestStackCrud(t *testing.T) {
+	inputs := []struct {
+		name    string
+		keyname string
+	}{
+		{
+			"devenvtest",
+			"Nik",
+		},
 	}
 
-	fmt.Printf("Rendered template:\n%s", output)
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
+			d, err := NewDevEnv(tc.name, tc.keyname, awssession)
+			if err != nil {
+				t.Errorf("Failed to create devenv object: %s", err)
+			}
+
+			exists := d.Exists()
+
+			assert.False(t, exists, "Stack %s already exists", tc.name)
+
+			fmt.Printf("Creating stack %s\n", tc.name)
+			id, err := d.Create()
+			if err != nil {
+				t.Errorf("Failed creating stack %q: %s", tc.name, err)
+			}
+
+			fmt.Printf("Created Stack %q\n", id)
+
+			start := time.Now()
+
+			fmt.Printf("Checking Stack Status\n")
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			statusDone := false
+
+			for {
+				select {
+				case <-time.After(10 * time.Second):
+					status, err := d.Status()
+					if err != nil {
+						t.Errorf("Error getting status for %s: %s", tc.name, err)
+						statusDone = true
+						break
+					}
+
+					fmt.Printf("  %s\n", status)
+
+					if status == "CREATE_COMPLETE" {
+						statusDone = true
+						break
+					}
+
+				case <-ctx.Done():
+					fmt.Printf("Stack Creation Timeout exceeded\n")
+					t.Fail()
+					statusDone = true
+					break
+				}
+
+				if statusDone {
+					break
+				}
+			}
+
+			finish := time.Now()
+
+			dur := finish.Sub(start)
+			fmt.Printf("Stack Creation took %f minutes.\n", dur.Minutes())
+
+			outputs, err := d.Outputs()
+			if err != nil {
+				t.Errorf("Error fetching Stack Outputs: %s", err)
+			}
+
+			fmt.Printf("Outputss:\n")
+			for _, o := range outputs {
+				fmt.Printf("  %s: %s\n", *o.OutputKey, *o.OutputValue)
+			}
+
+			params, err := d.Params()
+			if err != nil {
+				t.Errorf("Error fetching Stack Params: %s", err)
+			}
+
+			fmt.Printf("Parameters:\n")
+			for _, p := range params {
+				fmt.Printf("  %s: %s\n", *p.ParameterKey, *p.ParameterValue)
+			}
+
+			fmt.Printf("Deleting Stack\n")
+			err = d.Destroy()
+			if err != nil {
+				t.Errorf("failed destroying stack %s: %s", tc.name, err)
+			}
+
+			start = time.Now()
+
+			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			statusDone = false
+
+			for {
+				select {
+				case <-time.After(10 * time.Second):
+					status, err := d.Status()
+					// we don't fail the test if there's an error, cos when the stack is truly deleted, we'll error out when we try to check the status.
+					if err != nil {
+						fmt.Printf("  DELETE_COMPLETE\n")
+						statusDone = true
+						break
+					}
+
+					fmt.Printf("  %s\n", status)
+
+				case <-ctx.Done():
+					fmt.Printf("Stack Deletion Timeout exceeded\n")
+					t.Fail()
+					statusDone = true
+					break
+				}
+
+				if statusDone {
+					break
+				}
+			}
+
+			finish = time.Now()
+
+			dur = finish.Sub(start)
+			fmt.Printf("Stack Deleteion took %f minutes.\n", dur.Minutes())
+		})
+	}
 }
