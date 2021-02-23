@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"text/tabwriter"
 )
 
 // statusCmd represents the status command
@@ -63,7 +64,20 @@ Show status of a dev env by name.
 			log.Fatalf("Error getting status for %s: %s", name, err)
 		}
 
-		fmt.Printf("Status: %s\n", status)
+		fmt.Printf("Stack Status: %s\n", status)
+
+		fmt.Printf("Stack Outputs:\n")
+		outputs, err := d.Outputs()
+		if err != nil {
+			log.Fatalf("Error fetching Stack Outputs: %s", err)
+		}
+
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
+		for _, o := range outputs {
+			fmt.Fprintf(w, "  %s: \t %s\n", *o.OutputKey, *o.OutputValue)
+		}
+
+		w.Flush()
 	},
 }
 
