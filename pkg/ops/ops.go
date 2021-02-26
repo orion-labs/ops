@@ -1,3 +1,19 @@
+/*
+Copyright © 2021 Nik Ogura <nik@orionlabs.io>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package ops
 
 import (
@@ -28,14 +44,19 @@ const AWS_REGION_ENV_VAR = "AWS_REGION"
 // DEFAULT_TEMPLATE_URL S3 URL for CloudFormation Template
 const DEFAULT_TEMPLATE_URL = "https://orion-ptt-system.s3.amazonaws.com/orion-ptt-system.yaml"
 
+// DEFAULT_CONFIG_FILE Default config file name.
 const DEFAULT_CONFIG_FILE = ".orion-ptt-system.json"
 
+// ERR_TO_MANY_STACKS Error thrown when more than one stack of a given name is found.  Should be impossible.
 const ERR_TO_MANY_STACKS = "Multiple stacks of supplied name found"
 
+// DEFAULT_INSTANCE_NAME Default name for EC2 instance
 const DEFAULT_INSTANCE_NAME = "orion-ptt-system"
 
+// DEFAULT_INSTANCE_TYPE Default instance type
 const DEFAULT_INSTANCE_TYPE = "m5.2xlarge"
 
+// DEFAULT_VOLUME_SIZE Default EBS Volume size in Gigs.
 const DEFAULT_VOLUME_SIZE = 50
 
 // Stack  Programmatic representation of an Orion PTT System CloudFormation stack.
@@ -60,6 +81,7 @@ type StackConfig struct {
 	CreateVPC    string `json:"create_vpc"`
 }
 
+// NewStack  Creates a new programmatic representation of a Stack.  Creates the object/interface.  Doesn't actually create it in AWS until you call Create().
 func NewStack(config *StackConfig, awsSession *session.Session) (devenv *Stack, err error) {
 	if awsSession == nil {
 		sess, err := DefaultSession()
@@ -80,6 +102,7 @@ func NewStack(config *StackConfig, awsSession *session.Session) (devenv *Stack, 
 	return devenv, err
 }
 
+// LoadConfig Loads a config file from the filesystem.
 func LoadConfig(configPath string) (config *StackConfig, err error) {
 	config = &StackConfig{}
 
@@ -111,6 +134,7 @@ func LoadConfig(configPath string) (config *StackConfig, err error) {
 	return config, err
 }
 
+// AskForValue  Asks the user for any value not found in the config file.
 func AskForValue(parameter string) (value string) {
 	fmt.Printf("\nPlease enter a value for %s:\n", parameter)
 	fmt.Println()
@@ -126,6 +150,7 @@ func AskForValue(parameter string) (value string) {
 	return value
 }
 
+// AskForMissingParams Examines the config object and calls AskForValue() on any misisng value.
 func (c *StackConfig) AskForMissingParams(keyNeeded bool) (err error) {
 	if c.StackName == "" {
 		c.StackName = AskForValue("Stack Name")
@@ -172,6 +197,7 @@ func (c *StackConfig) AskForMissingParams(keyNeeded bool) (err error) {
 	return err
 }
 
+// Create hits the AWS API to create a Cloudformation stack.
 func (d *Stack) Create() (id string, err error) {
 	client := cloudformation.New(d.AwsSession)
 	input := cloudformation.CreateStackInput{
@@ -241,6 +267,7 @@ func (d *Stack) Create() (id string, err error) {
 	return id, err
 }
 
+// Outputs Fetches stack outputs from AWS
 func (d *Stack) Outputs() (outputs []*cloudformation.Output, err error) {
 	client := cloudformation.New(d.AwsSession)
 
@@ -263,6 +290,7 @@ func (d *Stack) Outputs() (outputs []*cloudformation.Output, err error) {
 	return outputs, err
 }
 
+// Params Fetches stack parameters from AWS.
 func (d *Stack) Params() (parameters []*cloudformation.Parameter, err error) {
 	client := cloudformation.New(d.AwsSession)
 
@@ -285,6 +313,7 @@ func (d *Stack) Params() (parameters []*cloudformation.Parameter, err error) {
 	return parameters, err
 }
 
+// Exists Returns true or false depending on whether the stack exists.
 func (d *Stack) Exists() (exists bool) {
 	client := cloudformation.New(d.AwsSession)
 
@@ -302,6 +331,7 @@ func (d *Stack) Exists() (exists bool) {
 	return exists
 }
 
+// Status  Fetches stack events from AWS.
 func (d *Stack) Status() (status string, err error) {
 	client := cloudformation.New(d.AwsSession)
 
@@ -328,6 +358,7 @@ func (d *Stack) Status() (status string, err error) {
 	return status, err
 }
 
+// Destroy Destroys a stack in AWS.
 func (d *Stack) Destroy() (err error) {
 	client := cloudformation.New(d.AwsSession)
 
