@@ -55,4 +55,6 @@ For all commands, the final argument is the name of the stack.  If you do not su
 
 ## Installation From Source
 
-    go get github.com/orion-labs/orion-ptt-system-ops...
+Provided you have a golang SDK installed, run the following command to build and install from source.  Note the trailing `/...`.
+
+    go get github.com/orion-labs/orion-ptt-system-ops/...

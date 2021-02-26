@@ -2,7 +2,6 @@ package ops
 
 import (
 	"bufio"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
@@ -17,22 +16,35 @@ import (
 	"strings"
 )
 
+// AWS_ID_ENV_VAR Default AWS SDK env var for AWS_ACCESS_KEY_ID
 const AWS_ID_ENV_VAR = "AWS_ACCESS_KEY_ID"
-const AWS_SECRET_ENV_VAR = "AWS_SECRET_ACCESS_KEY"
-const AWS_REGION_ENV_VAR = "AWS_DEFAULT_REGION"
 
+// AWS_SECRET_ENV_VAR Default AWS SDK env var for AWS_SECRET_ACCESS_KEY
+const AWS_SECRET_ENV_VAR = "AWS_SECRET_ACCESS_KEY"
+
+// AWS_REGION_ENV_VAR Default AWS SDK env var for AWS_REGION
+const AWS_REGION_ENV_VAR = "AWS_REGION"
+
+// DEFAULT_TEMPLATE_URL S3 URL for CloudFormation Template
 const DEFAULT_TEMPLATE_URL = "https://orion-ptt-system.s3.amazonaws.com/orion-ptt-system.yaml"
+
 const DEFAULT_CONFIG_FILE = ".orion-ptt-system.json"
+
 const ERR_TO_MANY_STACKS = "Multiple stacks of supplied name found"
+
 const DEFAULT_INSTANCE_NAME = "orion-ptt-system"
+
 const DEFAULT_INSTANCE_TYPE = "m5.2xlarge"
+
 const DEFAULT_VOLUME_SIZE = 50
 
+// Stack  Programmatic representation of an Orion PTT System CloudFormation stack.
 type Stack struct {
 	Config     *StackConfig
 	AwsSession *session.Session
 }
 
+// StackConfig  Config information for an Orion PTT System CloudFormation stack.
 type StackConfig struct {
 	StackName    string `json:"stack_name"`
 	KeyName      string `json:"key_name"`
