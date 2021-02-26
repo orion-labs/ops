@@ -59,6 +59,23 @@ const DEFAULT_INSTANCE_TYPE = "m5.2xlarge"
 // DEFAULT_VOLUME_SIZE Default EBS Volume size in Gigs.
 const DEFAULT_VOLUME_SIZE = 50
 
+// CONFIG_FILE_TEMPLATE Blanck default config file template for the 'config' command.
+const CONFIG_FILE_TEMPLATE = `{
+    "stack_name": "",
+    "key_name": "",
+    "dns_domain": "",
+    "dns_zone": "",
+    "vpc_id": "",
+    "ami_id": "",
+    "subnet_id": "",
+    "volume_size": 50,
+    "instance_name": "orion-ptt-system",
+    "instance_type": "m5.2xlarge",
+    "create_dns": "true",
+    "create_vpc": "false"
+}
+~    `
+
 // Stack  Programmatic representation of an Orion PTT System CloudFormation stack.
 type Stack struct {
 	Config     *StackConfig

@@ -13,16 +13,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
+	"github.com/mitchellh/go-homedir"
+	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
+	"github.com/spf13/cobra"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
-
-	"github.com/spf13/cobra"
 )
 
 // configCmd represents the config command
@@ -38,92 +40,81 @@ If it doesn't exist, we open a file with a basic template that you can fill out 
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("config called")
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "nano"
+		}
+
+		command, err := exec.LookPath(editor)
+		if err != nil {
+			log.Fatalf("Command %q not found: %s", editor, err)
+		}
+
+		tmpFile, err := ioutil.TempFile("", "secretfile")
+		if err != nil {
+			log.Fatalf("Error creating temp file: %s", err)
+		}
+
+		hd, err := homedir.Dir()
+		if err != nil {
+			log.Fatalf("failed to read home directory: %s", err)
+		}
+
+		filePath := fmt.Sprintf("%s/%s", hd, ops.DEFAULT_CONFIG_FILE)
+		var fileContents []byte
+
+		// if the default config file doesn't exist
+		if _, e := os.Stat(filePath); os.IsNotExist(e) {
+			fileContents = []byte(ops.CONFIG_FILE_TEMPLATE)
+		} else {
+			fc, err := ioutil.ReadFile(filePath)
+			if err != nil {
+				log.Fatalf("Error reading %s: %s", filePath, err)
+			}
+
+			fileContents = fc
+		}
+
+		err = ioutil.WriteFile(tmpFile.Name(), fileContents, 0644)
+		if err != nil {
+			log.Fatalf("failed writing temp file %s: %s", tmpFile.Name(), err)
+		}
+
+		defer os.Remove(tmpFile.Name())
+
+		shellenv := os.Environ()
+
+		prog := exec.Command(command, tmpFile.Name())
+
+		prog.Env = shellenv
+
+		prog.Stdout = os.Stdout
+		prog.Stderr = os.Stderr
+		prog.Stdin = os.Stdin
+
+		err = prog.Start()
+		if err != nil {
+			log.Fatalf("Error starting command: %s", err)
+		}
+
+		err = prog.Wait()
+		if err != nil {
+			log.Fatalf("Error waiting for command: %s", err)
+		}
+
+		contents, err := ioutil.ReadFile(tmpFile.Name())
+		if err != nil {
+			log.Fatalf("Error reading file: %s", err)
+		}
+
+		err = ioutil.WriteFile(filePath, contents, 0644)
+		if err != nil {
+			log.Fatalf("Error writing file %s: %s", filePath, err)
+		}
+
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(configCmd)
-}
-
-func EditConfig(path string) (err error) {
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "nano"
-	}
-
-	command, err := exec.LookPath(editor)
-	if err != nil {
-		fmt.Printf("Command %q not found: %s", editor, err)
-		os.Exit(1)
-	}
-
-	tmpFile, err := ioutil.TempFile("", "secretfile")
-	if err != nil {
-		fmt.Printf("Error creating temp file: %s", err)
-		os.Exit(1)
-	}
-
-	if _, e
-
-	secret, err := GetSecret(client, path)
-	if err != nil {
-		err = errors.Wrapf(err, "failed getting path %s", path)
-		return err
-	}
-
-	var fetchedSecretOutput string
-
-	if secret != nil {
-		data, ok := secret.Data["data"].(map[string]interface{})
-		if ok {
-			for k, v := range data {
-				fetchedSecretOutput += fmt.Sprintf("%s: %s\n", k, v)
-			}
-		} else {
-			err = errors.New("Malformed secret data")
-			return err
-		}
-	}
-
-	err = ioutil.WriteFile(tmpFile.Name(), []byte(fmt.Sprintf(secretTemplate(), path, fetchedSecretOutput)), 0644)
-	if err != nil {
-		err = errors.Wrapf(err, "failed writing secret temp file %s", tmpFile.Name())
-		return err
-	}
-
-	defer os.Remove(tmpFile.Name())
-
-	shellenv := os.Environ()
-
-	cmd := exec.Command(command, tmpFile.Name())
-
-	cmd.Env = shellenv
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	err = cmd.Start()
-	if err != nil {
-		fmt.Printf("Error starting command: %s", err)
-		os.Exit(1)
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		fmt.Printf("Error waiting for command: %s", err)
-		os.Exit(1)
-	}
-
-	contents, err := ioutil.ReadFile(tmpFile.Name())
-	if err != nil {
-		fmt.Printf("Error reading file: %s", err)
-		os.Exit(1)
-	}
-
-	// TODO copy temp file to ~/.orion-ptt-system.json
-
-
-	return err
 }
