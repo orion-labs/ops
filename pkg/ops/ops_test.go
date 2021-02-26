@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/onbeep/awslibs/pkg/awslibs"
 	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
@@ -35,7 +34,7 @@ func TestMain(m *testing.M) {
 func setUp() {
 
 	if awssession == nil {
-		sess, err := awslibs.DefaultSession()
+		sess, err := DefaultSession()
 		if err != nil {
 			log.Fatalf("failed creating aws session: %s", err)
 		}

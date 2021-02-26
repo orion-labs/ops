@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/mitchellh/go-homedir"
-	"github.com/onbeep/awslibs/pkg/awslibs"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
@@ -17,6 +16,10 @@ import (
 	"strconv"
 	"strings"
 )
+
+const AWS_ID_ENV_VAR = "AWS_ACCESS_KEY_ID"
+const AWS_SECRET_ENV_VAR = "AWS_SECRET_ACCESS_KEY"
+const AWS_REGION_ENV_VAR = "AWS_DEFAULT_REGION"
 
 const DEFAULT_TEMPLATE_URL = "https://orion-ptt-system.s3.amazonaws.com/orion-ptt-system.yaml"
 const DEFAULT_CONFIG_FILE = ".orion-ptt-system.json"
@@ -47,7 +50,7 @@ type StackConfig struct {
 
 func NewStack(config *StackConfig, awsSession *session.Session) (devenv *Stack, err error) {
 	if awsSession == nil {
-		sess, err := awslibs.DefaultSession()
+		sess, err := DefaultSession()
 		if err != nil {
 			log.Fatalf("failed creating aws session: %s", err)
 		}
@@ -326,4 +329,23 @@ func (d *Stack) Destroy() (err error) {
 	}
 
 	return err
+}
+
+// DefaultSession creates a default AWS session from local config path.
+func DefaultSession() (awssession *session.Session, err error) {
+	if os.Getenv(AWS_ID_ENV_VAR) == "" && os.Getenv(AWS_SECRET_ENV_VAR) == "" {
+		_ = os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
+	}
+
+	awssession, err = session.NewSession()
+	if err != nil {
+		log.Fatalf("Failed to create aws session")
+	}
+
+	// For some reason this doesn't get picked up automatically.
+	if os.Getenv(AWS_REGION_ENV_VAR) != "" {
+		awssession.Config.Region = aws.String(os.Getenv(AWS_REGION_ENV_VAR))
+	}
+
+	return awssession, err
 }
