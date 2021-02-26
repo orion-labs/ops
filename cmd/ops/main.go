@@ -13,7 +13,9 @@
 
 package main
 
-import "github.com/onbeep/devenv/cmd"
+import (
+	"github.com/orion-labs/orion-ptt-system-ops/cmd/ops/cmd"
+)
 
 func main() {
 	cmd.Execute()

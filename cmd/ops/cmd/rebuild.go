@@ -16,51 +16,58 @@ limitations under the License.
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"github.com/onbeep/devenv/pkg/devenv"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
-	"strings"
 	"text/tabwriter"
 	"time"
 )
 
-// glassCmd represents the glass command
-var glassCmd = &cobra.Command{
-	Use:   "glass",
-	Short: "Nuke and pave an environment (destroy, then recreate).",
+// recreateCmd represents the recreate command
+var recreateCmd = &cobra.Command{
+	Use:   "rebuild [name]",
+	Short: "Destroy and recreate an Orion PTT System stack.",
 	Long: `
-Nuke and pave an environment (destroy, then recreate).
+Destroy and recreate an Orion PTT System stack.
+
+No different from calling 'create', followed by 'destroy', but it will read the SSH Key from the stack before destruction, and automatically reuse it again on creation.
 
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		config, err := ops.LoadConfig(configPath)
+		if err != nil {
+			log.Fatalf("failed to read config file at %s: %s", configPath, err)
+		}
+
 		if name == "" {
 			if len(args) > 0 {
 				name = args[0]
 			}
 		}
 
-		if name == "" {
-			fmt.Println("\nPlease enter stack name:")
-			fmt.Println()
-			var n string
-
-			reader := bufio.NewReader(os.Stdin)
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				log.Fatal("failed to read response")
-			}
-
-			n = strings.TrimRight(input, "\n")
-			keyname = n
+		if name != "" {
+			config.StackName = name
 		}
 
-		d, err := devenv.NewDevEnv(name, keyname, nil)
+		err = config.AskForMissingParams(false)
+		if err != nil {
+			log.Fatalf("Failed asking for missing parameters")
+		}
+
+		d, err := ops.NewStack(config, nil)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
+		}
+
+		if dryRun {
+			fmt.Printf("Config:\n")
+			spew.Dump(config)
+			os.Exit(0)
 		}
 
 		exists := d.Exists()
@@ -75,36 +82,18 @@ Nuke and pave an environment (destroy, then recreate).
 
 		for _, p := range params {
 			if *p.ParameterKey == "KeyName" {
-				d, err = devenv.NewDevEnv(name, *p.ParameterValue, nil)
-				if err != nil {
-					log.Fatalf("Failed to create devenv object: %s", err)
-				}
+				d.Config.KeyName = *p.ParameterValue
 			}
 		}
 
-		fmt.Printf("Nuking and Paving Stack %q.\n", name)
+		fmt.Printf("Nuking and Paving Stack %q.\n", d.Config.StackName)
 
-		if d.KeyName == "" {
-			fmt.Println("\nPlease enter SSH Key Name (Must match Key Name in AWS Console):")
-			fmt.Println()
-			var k string
+		fmt.Printf("Using KeyPair: %q\n", d.Config.KeyName)
 
-			reader := bufio.NewReader(os.Stdin)
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				log.Fatal("failed to read response")
-			}
-
-			k = strings.TrimRight(input, "\n")
-			d.KeyName = k
-		} else {
-			fmt.Printf("Using KeyPair: %q\n", d.KeyName)
-		}
-
-		fmt.Printf("Deleting Stack %q.\n", name)
+		fmt.Printf("Deleting Stack %q.\n", d.Config.StackName)
 		err = d.Destroy()
 		if err != nil {
-			log.Fatalf("failed destroying stack %s: %s", name, err)
+			log.Fatalf("failed destroying stack %s: %s", d.Config.StackName, err)
 		}
 
 		start := time.Now()
@@ -145,10 +134,10 @@ Nuke and pave an environment (destroy, then recreate).
 		dur := finish.Sub(start)
 		fmt.Printf("Stack Deletion took %f minutes.\n", dur.Minutes())
 
-		fmt.Printf("Creating stack %q.\n", name)
+		fmt.Printf("Creating stack %q.\n", d.Config.StackName)
 		_, err = d.Create()
 		if err != nil {
-			log.Fatalf("Failed creating stack %q: %s", name, err)
+			log.Fatalf("Failed creating stack %q: %s", d.Config.StackName, err)
 		}
 
 		fmt.Printf("Stack created.  Polling for status.\n")
@@ -168,7 +157,7 @@ Nuke and pave an environment (destroy, then recreate).
 			case <-time.After(10 * time.Second):
 				status, err := d.Status()
 				if err != nil {
-					log.Fatalf("Error getting status for %s: %s", name, err)
+					log.Fatalf("Error getting status for %s: %s", d.Config.StackName, err)
 				}
 
 				ts := time.Now()
@@ -196,10 +185,10 @@ Nuke and pave an environment (destroy, then recreate).
 		}
 
 		if rollback {
-			fmt.Printf("Create failed.  Deleting Stack %q.\n", name)
+			fmt.Printf("Create failed.  Deleting Stack %q.\n", d.Config.StackName)
 			err = d.Destroy()
 			if err != nil {
-				log.Fatalf("failed destroying stack %s: %s", name, err)
+				log.Fatalf("failed destroying stack %s: %s", d.Config.StackName, err)
 			}
 
 			start := time.Now()
@@ -255,16 +244,16 @@ Nuke and pave an environment (destroy, then recreate).
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
 		for _, o := range outputs {
-			fmt.Fprintf(w, "  %s: \t %s\n", *o.OutputKey, *o.OutputValue)
+			_, _ = fmt.Fprintf(w, "  %s: \t %s\n", *o.OutputKey, *o.OutputValue)
 		}
 
-		w.Flush()
+		_ = w.Flush()
 
 		fmt.Printf("\nNB: Even though the stack is created, it takes a few minutes to install Kubernetes and kotsadm.  The above URL's won't be available until kotsadm is ready, and you install your license.\n\n")
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(glassCmd)
+	rootCmd.AddCommand(recreateCmd)
 
 }

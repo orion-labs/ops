@@ -16,13 +16,12 @@ limitations under the License.
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"github.com/onbeep/devenv/pkg/devenv"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -30,42 +29,50 @@ import (
 
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
-	Use:   "destroy",
-	Short: "Destroy a dev env by name.",
+	Use:   "destroy [name]",
+	Short: "Destroy an Orion PTT System stack",
 	Long: `
-Destroy a dev env by name.
+Destroy an Orion PTT System stack.
+
+No different from pushing the 'Delete Stack' button in the AWS Cloudformation console.
+
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		config, err := ops.LoadConfig(configPath)
+		if err != nil {
+			log.Fatalf("failed to read config file at %s: %s", configPath, err)
+		}
+
 		if name == "" {
 			if len(args) > 0 {
 				name = args[0]
 			}
 		}
 
-		if name == "" {
-			fmt.Println("\nPlease enter stack name:")
-			fmt.Println()
-			var n string
-
-			reader := bufio.NewReader(os.Stdin)
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				log.Fatal("failed to read response")
-			}
-
-			n = strings.TrimRight(input, "\n")
-			keyname = n
+		if name != "" {
+			config.StackName = name
 		}
 
-		d, err := devenv.NewDevEnv(name, keyname, nil)
+		err = config.AskForMissingParams(false)
+		if err != nil {
+			log.Fatalf("Failed asking for missing parameters")
+		}
+
+		d, err := ops.NewStack(config, nil)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
 
-		fmt.Printf("Deleting Stack %q.\n", name)
+		if dryRun {
+			fmt.Printf("Config:\n")
+			spew.Dump(config)
+			os.Exit(0)
+		}
+
+		fmt.Printf("Deleting Stack %q.\n", d.Config.StackName)
 		err = d.Destroy()
 		if err != nil {
-			log.Fatalf("failed destroying stack %s: %s", name, err)
+			log.Fatalf("failed destroying stack %s: %s", d.Config.StackName, err)
 		}
 
 		start := time.Now()

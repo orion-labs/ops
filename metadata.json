@@ -1,8 +1,8 @@
 {
-  "name": "devenv",
-  "version": "0.3.0",
-  "package": "github.com/onbeep/devenv",
-  "description": "Easily manage orion-ptt-system instances",
+  "name": "ops",
+  "version": "1.0.0",
+  "package": "github.com/orion-labs/orion-ptt-system-ops",
+  "description": "Easily manage Orion PTT System stacks via CloudFormation.",
   "repository": "https://orionlabs-dbt-tools.s3.us-east-1.amazonaws.com",
   "building": {
     "targets": [

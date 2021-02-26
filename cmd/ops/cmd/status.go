@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+Copyright © 2021 Nik Ogura <nik@orionlabs.io>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,55 +16,63 @@ limitations under the License.
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"github.com/onbeep/devenv/pkg/devenv"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
-	"strings"
 	"text/tabwriter"
 )
 
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show status of a dev env by name.",
+	Use:   "status [name]",
+	Short: "Show status of an Orion PTT System stack.",
 	Long: `
-Show status of a dev env by name.
+Show status of an Orion PTT System stack.
+
+Looks for the most recent Event for the CloudFormation stack, and returns it along with all stack outputs.
+
 `,
 	Run: func(cmd *cobra.Command, args []string) {
+		config, err := ops.LoadConfig(configPath)
+		if err != nil {
+			log.Fatalf("failed to read config file at %s: %s", configPath, err)
+		}
+
 		if name == "" {
 			if len(args) > 0 {
 				name = args[0]
 			}
 		}
 
-		if name == "" {
-			fmt.Println("\nPlease enter stack name:")
-			fmt.Println()
-			var n string
-
-			reader := bufio.NewReader(os.Stdin)
-			input, err := reader.ReadString('\n')
-			if err != nil {
-				log.Fatal("failed to read response")
-			}
-
-			n = strings.TrimRight(input, "\n")
-			keyname = n
+		if name != "" {
+			config.StackName = name
 		}
-		d, err := devenv.NewDevEnv(name, keyname, nil)
+
+		err = config.AskForMissingParams(false)
+		if err != nil {
+			log.Fatalf("Failed asking for missing parameters")
+		}
+
+		d, err := ops.NewStack(config, nil)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
 
-		status, err := d.Status()
-		if err != nil {
-			log.Fatalf("Error getting status for %s: %s", name, err)
+		if dryRun {
+			fmt.Printf("Config:\n")
+			spew.Dump(config)
+			os.Exit(0)
 		}
 
-		fmt.Printf("Stack Status: %s\n", status)
+		status, err := d.Status()
+		if err != nil {
+			log.Fatalf("Error getting status for %s: %s", d.Config.StackName, err)
+		}
+
+		fmt.Printf("Status for stack %q: %s\n", d.Config.StackName, status)
 
 		fmt.Printf("Stack Outputs:\n")
 		outputs, err := d.Outputs()
@@ -74,23 +82,13 @@ Show status of a dev env by name.
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
 		for _, o := range outputs {
-			fmt.Fprintf(w, "  %s: \t %s\n", *o.OutputKey, *o.OutputValue)
+			_, _ = fmt.Fprintf(w, "  %s: \t %s\n", *o.OutputKey, *o.OutputValue)
 		}
 
-		w.Flush()
+		_ = w.Flush()
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(statusCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// statusCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// statusCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

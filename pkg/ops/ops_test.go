@@ -1,4 +1,4 @@
-package devenv
+package ops
 
 import (
 	"context"
@@ -13,6 +13,14 @@ import (
 )
 
 var awssession *session.Session
+var dnsZoneID string
+var dnsDomain string
+var vpcID string
+var volumeSize int
+var instanceName string
+var instanceType string
+var amiID string
+var subnetID string
 
 func TestMain(m *testing.M) {
 	setUp()
@@ -35,6 +43,14 @@ func setUp() {
 		awssession = sess
 	}
 
+	dnsDomain = os.Getenv("ORION_DNS_DOMAIN")
+	dnsZoneID = os.Getenv("ORION_DNS_ZONE_ID")
+	vpcID = os.Getenv("ORION_VPC_ID")
+	amiID = os.Getenv("ORION_AMI_ID")
+	subnetID = os.Getenv("ORION_SUBNET")
+	volumeSize = DEFAULT_VOLUME_SIZE
+	instanceName = DEFAULT_INSTANCE_NAME
+	instanceType = DEFAULT_INSTANCE_TYPE
 }
 
 func tearDown() {
@@ -43,18 +59,31 @@ func tearDown() {
 
 func TestStackCrud(t *testing.T) {
 	inputs := []struct {
-		name    string
-		keyname string
+		name   string
+		config StackConfig
 	}{
 		{
-			"devenvtest",
-			"Nik",
+			"opstest",
+			StackConfig{
+				StackName:    "opstest",
+				KeyName:      "Nik",
+				DNSDomain:    dnsDomain,
+				DNSZoneID:    dnsZoneID,
+				VPCID:        vpcID,
+				VolumeSize:   volumeSize,
+				InstanceName: instanceName,
+				InstanceType: instanceType,
+				AMIID:        amiID,
+				SubnetID:     subnetID,
+				CreateDNS:    "true",
+				CreateVPC:    "false",
+			},
 		},
 	}
 
 	for _, tc := range inputs {
 		t.Run(tc.name, func(t *testing.T) {
-			d, err := NewDevEnv(tc.name, tc.keyname, awssession)
+			d, err := NewStack(&tc.config, awssession)
 			if err != nil {
 				t.Errorf("Failed to create devenv object: %s", err)
 			}

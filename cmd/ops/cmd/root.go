@@ -21,17 +21,20 @@ import (
 
 var name string
 var keyname string
+var configPath string
+var autoRollback bool
+var dryRun bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "devenv",
-	Short: "Easily manage orion-ptt-system instances",
-	// Note:  Change the following line to backticks for long multiline descriptions.
-	Long: "Easily manage orion-ptt-system instances",
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//Run: func(cmd *cobra.Command, args []string) {
-	//},
+	Use:   "ops <subcommand> [name]",
+	Short: "Easily manage Orion PTT System stacks.",
+	Long: `
+Easily manage Orion PTT System stacks.
+
+Instruments the AWS CloudFormation API so you don't have to all that tedious mucking about in the AWS console.
+
+`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -46,4 +49,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&name, "name", "n", "", "environment name")
 	rootCmd.PersistentFlags().StringVarP(&keyname, "keyname", "k", "", "ssh key name")
+	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "~/.orion-ptt-system.json", "path to config file")
+	rootCmd.PersistentFlags().BoolVarP(&autoRollback, "rollback", "r", true, "Automatically rollback if creation fails.")
+	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dryrun", "d", false, "dry run.  Prints Config info and exits.")
 }
