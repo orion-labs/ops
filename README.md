@@ -43,15 +43,15 @@ For all commands, the final argument is the name of the stack.  If you do not su
 
 ### Display Status of a Stack, and all it's Outputs
 
-    ops devenv status <name>
+    ops status <name>
 
-### Glass a Stack (Nuke and Pave, i.e. destroy and recreate)
+### Rebuild a Stack 
 
-    ops devenv glass <name>
+    ops rebuild <name>
 
 ### Fetch the CA Certificate from a Stack
 
-    ops devenv cacert <name>
+    ops cacert <name>
 
 ## Installation From Source
 
