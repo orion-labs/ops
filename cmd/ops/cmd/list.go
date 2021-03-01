@@ -25,8 +25,11 @@ import (
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "",
+	Short: "List Orion PTT Stacks",
 	Long: `
+List Orion PTT Stacks.
+
+Queries AWS CloudFormation and returns a list of stacks who's description matches that of the CloudForation Yaml Template in S3.'
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := ops.LoadConfig(configPath)
