@@ -11,4 +11,5 @@ require (
 	github.com/spf13/cobra v0.0.0-20171207074935-ccaecb155a21
 	github.com/spf13/pflag v0.0.0-20171106142849-4c012f6dcd95 // indirect
 	github.com/stretchr/testify v1.7.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )

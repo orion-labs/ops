@@ -72,6 +72,52 @@ func tearDown() {
 
 }
 
+func TestListStacks(t *testing.T) {
+	inputs := []struct {
+		name   string
+		config StackConfig
+	}{
+		{
+			"opstest",
+			StackConfig{
+				StackName:    "opstest",
+				KeyName:      "Nik",
+				DNSDomain:    dnsDomain,
+				DNSZoneID:    dnsZoneID,
+				VPCID:        vpcID,
+				VolumeSize:   volumeSize,
+				InstanceName: instanceName,
+				InstanceType: instanceType,
+				AMIID:        amiID,
+				SubnetID:     subnetID,
+				CreateDNS:    "true",
+				CreateVPC:    "false",
+			},
+		},
+	}
+
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := NewStack(&tc.config, awssession)
+			if err != nil {
+				t.Errorf("Failed to create devenv object: %s", err)
+			}
+
+			stacks, err := s.ListStacks()
+			if err != nil {
+				t.Errorf("Error listing stacks: %s", err)
+			}
+
+			fmt.Printf("Stacks:\n")
+
+			for _, s := range stacks {
+				fmt.Printf("  %s\n", *s.StackName)
+			}
+		})
+	}
+
+}
+
 func TestStackCrud(t *testing.T) {
 	inputs := []struct {
 		name   string

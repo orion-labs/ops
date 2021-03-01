@@ -25,8 +25,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -408,4 +410,55 @@ func DefaultSession() (awssession *session.Session, err error) {
 	}
 
 	return awssession, err
+}
+
+type SimpleCFTemplate struct {
+	Description string `yaml:"Description"`
+}
+
+// ListStacks Queries the CF Yaml, and AWS, returning a list of stacks with a description that matches the description in the yaml template.
+func (d *Stack) ListStacks() (stacks []*cloudformation.Stack, err error) {
+	stacks = make([]*cloudformation.Stack, 0)
+	resp, err := http.Get(DEFAULT_TEMPLATE_URL)
+	if err != nil {
+		err = errors.Wrapf(err, "error getting %s", DEFAULT_TEMPLATE_URL)
+		return stacks, err
+	}
+
+	if resp.StatusCode == 200 {
+		defer resp.Body.Close()
+
+		yamlBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			err = errors.Wrapf(err, "failed reading response body")
+			return stacks, err
+		}
+
+		var cfTemplate SimpleCFTemplate
+
+		err = yaml.Unmarshal(yamlBytes, &cfTemplate)
+		if err != nil {
+			err = errors.Wrapf(err, "failed unmarshalling CF yaml.")
+			return stacks, err
+		}
+
+		client := cloudformation.New(d.AwsSession)
+
+		input := cloudformation.DescribeStacksInput{}
+
+		output, err := client.DescribeStacks(&input)
+		if err != nil {
+			return stacks, err
+		}
+
+		for _, s := range output.Stacks {
+			if s.Description != nil {
+				if *s.Description == cfTemplate.Description {
+					stacks = append(stacks, s)
+				}
+			}
+		}
+	}
+
+	return stacks, err
 }
