@@ -29,9 +29,9 @@ import (
 // statusCmd represents the status command
 var statusCmd = &cobra.Command{
 	Use:   "status [name]",
-	Short: "Show status of an Orion PTT System stack.",
+	Short: "Show status of an Orion PTT System stack and it's outputs.",
 	Long: `
-Show status of an Orion PTT System stack.
+Show status of an Orion PTT System stack and it's outputs'.
 
 Looks for the most recent Event for the CloudFormation stack, and returns it along with all stack outputs.
 
