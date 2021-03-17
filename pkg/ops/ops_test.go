@@ -19,6 +19,7 @@ package ops
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"log"
@@ -91,7 +92,7 @@ func TestListStacks(t *testing.T) {
 		{
 			"opstest",
 			StackConfig{
-				StackName:    "opstest",
+				StackName:    fmt.Sprintf("opstest-%s", uuid.New().String()),
 				KeyName:      "Nik",
 				DNSDomain:    dnsDomain,
 				DNSZoneID:    dnsZoneID,
@@ -137,7 +138,7 @@ func TestStackCrud(t *testing.T) {
 		{
 			"opstest",
 			StackConfig{
-				StackName:      "opstest",
+				StackName:      fmt.Sprintf("opstest-%s", uuid.New().String()),
 				KeyName:        "Nik",
 				DNSDomain:      dnsDomain,
 				DNSZoneID:      dnsZoneID,
@@ -191,6 +192,7 @@ func TestStackCrud(t *testing.T) {
 //}
 
 func TestCreateConfig(t *testing.T) {
+
 	inputs := []struct {
 		name     string
 		config   StackConfig
@@ -199,7 +201,7 @@ func TestCreateConfig(t *testing.T) {
 		{
 			"opstest",
 			StackConfig{
-				StackName:      "opstest",
+				StackName:      fmt.Sprintf("opstest-%s", uuid.New().String()),
 				KeyName:        "Nik",
 				DNSDomain:      dnsDomain,
 				DNSZoneID:      dnsZoneID,

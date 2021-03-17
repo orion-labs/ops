@@ -2,11 +2,11 @@ package ops
 
 import (
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 )
 
 func (s *Stack) Destroy() (err error) {
@@ -50,23 +50,19 @@ func (s *Stack) Destroy() (err error) {
 		return err
 	}
 
-	hd, err := homedir.Dir()
-	if err != nil {
-		err = errors.Wrapf(err, "failed to detect homedir")
-		return err
-	}
+	if runtime.GOOS == "darwin" {
+		shellCmd := exec.Command(sudo, "security", "delete-certificate", "-c", caHost, "/Library/Keychains/System.keychain")
 
-	shellCmd := exec.Command(sudo, "security", "delete-certificate", "-c", caHost, fmt.Sprintf("%s/Library/Keychains/login.keychain", hd))
+		shellCmd.Stdout = os.Stdout
+		shellCmd.Stderr = os.Stderr
+		shellCmd.Stdin = os.Stdin
 
-	shellCmd.Stdout = os.Stdout
-	shellCmd.Stderr = os.Stderr
-	shellCmd.Stdin = os.Stdin
-
-	e := shellCmd.Run()
-	if e != nil {
-		log.Printf("error deleting trust for cert: %s\nYou may have to do it manually.\n", caHost)
-	} else {
-		fmt.Printf("Trust removed for %s.\n", caHost)
+		e := shellCmd.Run()
+		if e != nil {
+			log.Printf("error deleting trust for cert: %s\nYou may have to do it manually.\n", caHost)
+		} else {
+			fmt.Printf("Trust removed for %s.\n", caHost)
+		}
 	}
 
 	return err
