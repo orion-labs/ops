@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
@@ -65,7 +66,7 @@ e.g. "ops get ip [<name>]" fetches just the IP address of a stack.
 			log.Fatalf("Failed asking for missing parameters")
 		}
 
-		d, err := ops.NewStack(config, nil)
+		s, err := ops.NewStack(config, nil, autoRollback)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
@@ -76,7 +77,7 @@ e.g. "ops get ip [<name>]" fetches just the IP address of a stack.
 			os.Exit(0)
 		}
 
-		outputs, err := d.Outputs()
+		outputs, err := s.Outputs()
 		if err != nil {
 			log.Fatalf("Error fetching Stack Outputs: %s", err)
 		}

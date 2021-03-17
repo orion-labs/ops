@@ -17,14 +17,13 @@ limitations under the License.
 package ops
 
 import (
-	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 	"log"
 	"os"
 	"testing"
-	"time"
 )
 
 var awssession *session.Session
@@ -36,6 +35,13 @@ var instanceName string
 var instanceType string
 var amiID string
 var subnetID string
+var sshPort int
+var sshAddress string
+var sshServerRunning bool
+var licensefile string
+var templatefile string
+var orionuser string
+var orionpassword string
 
 func TestMain(m *testing.M) {
 	setUp()
@@ -58,6 +64,7 @@ func setUp() {
 		awssession = sess
 	}
 
+	TESTING = true
 	dnsDomain = os.Getenv("ORION_DNS_DOMAIN")
 	dnsZoneID = os.Getenv("ORION_DNS_ZONE_ID")
 	vpcID = os.Getenv("ORION_VPC_ID")
@@ -66,6 +73,10 @@ func setUp() {
 	volumeSize = DEFAULT_VOLUME_SIZE
 	instanceName = DEFAULT_INSTANCE_NAME
 	instanceType = DEFAULT_INSTANCE_TYPE
+	licensefile = os.Getenv("ORION_LICENSE")
+	templatefile = os.Getenv("ORION_TEMPLATE")
+	orionuser = os.Getenv("ORION_USER")
+	orionpassword = os.Getenv("ORION_ADMIN_PASSWORD")
 }
 
 func tearDown() {
@@ -98,9 +109,9 @@ func TestListStacks(t *testing.T) {
 
 	for _, tc := range inputs {
 		t.Run(tc.name, func(t *testing.T) {
-			s, err := NewStack(&tc.config, awssession)
+			s, err := NewStack(&tc.config, awssession, true)
 			if err != nil {
-				t.Errorf("Failed to create devenv object: %s", err)
+				t.Errorf("Failed to create stack object: %s", err)
 			}
 
 			stacks, err := s.ListStacks()
@@ -126,146 +137,140 @@ func TestStackCrud(t *testing.T) {
 		{
 			"opstest",
 			StackConfig{
-				StackName:    "opstest",
-				KeyName:      "Nik",
-				DNSDomain:    dnsDomain,
-				DNSZoneID:    dnsZoneID,
-				VPCID:        vpcID,
-				VolumeSize:   volumeSize,
-				InstanceName: instanceName,
-				InstanceType: instanceType,
-				AMIID:        amiID,
-				SubnetID:     subnetID,
-				CreateDNS:    "true",
-				CreateVPC:    "false",
+				StackName:      "opstest",
+				KeyName:        "Nik",
+				DNSDomain:      dnsDomain,
+				DNSZoneID:      dnsZoneID,
+				VPCID:          vpcID,
+				VolumeSize:     volumeSize,
+				InstanceName:   instanceName,
+				InstanceType:   instanceType,
+				AMIID:          amiID,
+				SubnetID:       subnetID,
+				CreateDNS:      "true",
+				CreateVPC:      "false",
+				LicenseFile:    licensefile,
+				ConfigTemplate: templatefile,
+				Username:       orionuser,
+				AdminPassword:  orionpassword,
 			},
 		},
 	}
 
 	for _, tc := range inputs {
 		t.Run(tc.name, func(t *testing.T) {
-			d, err := NewStack(&tc.config, awssession)
+			s, err := NewStack(&tc.config, awssession, true)
 			if err != nil {
 				t.Errorf("Failed to create devenv object: %s", err)
 			}
 
-			exists := d.Exists()
-
-			assert.False(t, exists, "Stack %s already exists", tc.name)
-
-			fmt.Printf("Creating stack %s\n", tc.name)
-			id, err := d.Create()
+			err = s.Create()
 			if err != nil {
-				t.Errorf("Failed creating stack %q: %s", tc.name, err)
+				t.Errorf("Stack creation failed: %s", err)
 			}
 
-			fmt.Printf("Created Stack %q\n", id)
+			err = s.Destroy()
+			if err != nil {
+				t.Errorf("Stack deletio failed: %s", err)
+			}
+		})
+	}
+}
 
-			start := time.Now()
+//func TestSCPFile(t *testing.T) {
+//	hostname := ""
+//	username := os.Getenv("ORION_USER")
+//	srcfile := "/path/to/file/orion-ptt-system.yaml"
+//	filename := "foo.yaml"
+//
+//	err := SCPFile(srcfile, filename, hostname, username)
+//	if err != nil {
+//		t.Errorf("failed to copy %s to %s as %s: %s", filename, hostname, username, err)
+//	}
+//
+//}
 
-			fmt.Printf("Checking Stack Status\n")
+func TestCreateConfig(t *testing.T) {
+	inputs := []struct {
+		name     string
+		config   StackConfig
+		template string
+	}{
+		{
+			"opstest",
+			StackConfig{
+				StackName:      "opstest",
+				KeyName:        "Nik",
+				DNSDomain:      dnsDomain,
+				DNSZoneID:      dnsZoneID,
+				VPCID:          vpcID,
+				VolumeSize:     volumeSize,
+				InstanceName:   instanceName,
+				InstanceType:   instanceType,
+				AMIID:          amiID,
+				SubnetID:       subnetID,
+				CreateDNS:      "true",
+				CreateVPC:      "false",
+				Username:       orionuser,
+				LicenseFile:    licensefile,
+				ConfigTemplate: templatefile,
+			},
+			`apiVersion: kots.io/v1beta1
+kind: ConfigValues
+metadata:
+  name: Orionlabs PTT System
+spec:
+  values:
+    atlas_hostname:
+      default: login.allorion.com
+      value: login-{{.StackName}}.allorion.com
+    session_keystore:
+      value: '{{.Keystore}}'
+`,
+		},
+	}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := NewStack(&tc.config, awssession, true)
+			if err != nil {
+				t.Errorf("Failed to create stacks object: %s", err)
+			}
 
-			statusDone := false
+			config, err := s.CreateConfig()
+			if err != nil {
+				t.Errorf("failed to create template: %s", err)
+			}
 
-			for {
-				select {
-				case <-time.After(10 * time.Second):
-					status, err := d.Status()
-					if err != nil {
-						t.Errorf("Error getting status for %s: %s", tc.name, err)
-						statusDone = true
-						break
+			var output map[string]interface{}
+
+			err = yaml.Unmarshal([]byte(config), &output)
+			if err != nil {
+				t.Errorf("Failed to unmarshal yaml in config: %s", err)
+			}
+
+			// spec.values.session_keystore.values
+			spec, ok := output["spec"].(map[string]interface{})
+			if ok {
+				values, ok := spec["values"].(map[string]interface{})
+				if ok {
+					sks, ok := values["session_keystore"].(map[string]interface{})
+					if ok {
+						keystore, ok := sks["value"].(string)
+						if ok {
+							assert.True(t, keystore != "")
+						} else {
+							t.Errorf("failed to get keystore value")
+						}
+					} else {
+						t.Errorf("failed to get session keystore")
 					}
-
-					fmt.Printf("  %s\n", status)
-
-					if status == "CREATE_COMPLETE" {
-						statusDone = true
-						break
-					}
-
-				case <-ctx.Done():
-					fmt.Printf("Stack Creation Timeout exceeded\n")
-					t.Fail()
-					statusDone = true
-					break
+				} else {
+					t.Error("failed to parse values")
 				}
-
-				if statusDone {
-					break
-				}
+			} else {
+				t.Error("failed to parse spec out of config")
 			}
-
-			finish := time.Now()
-
-			dur := finish.Sub(start)
-			fmt.Printf("Stack Creation took %f minutes.\n", dur.Minutes())
-
-			outputs, err := d.Outputs()
-			if err != nil {
-				t.Errorf("Error fetching Stack Outputs: %s", err)
-			}
-
-			fmt.Printf("Outputss:\n")
-			for _, o := range outputs {
-				fmt.Printf("  %s: %s\n", *o.OutputKey, *o.OutputValue)
-			}
-
-			params, err := d.Params()
-			if err != nil {
-				t.Errorf("Error fetching Stack Params: %s", err)
-			}
-
-			fmt.Printf("Parameters:\n")
-			for _, p := range params {
-				fmt.Printf("  %s: %s\n", *p.ParameterKey, *p.ParameterValue)
-			}
-
-			fmt.Printf("Deleting Stack\n")
-			err = d.Destroy()
-			if err != nil {
-				t.Errorf("failed destroying stack %s: %s", tc.name, err)
-			}
-
-			start = time.Now()
-
-			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
-
-			statusDone = false
-
-			for {
-				select {
-				case <-time.After(10 * time.Second):
-					status, err := d.Status()
-					// we don't fail the test if there's an error, cos when the stack is truly deleted, we'll error out when we try to check the status.
-					if err != nil {
-						fmt.Printf("  DELETE_COMPLETE\n")
-						statusDone = true
-						break
-					}
-
-					fmt.Printf("  %s\n", status)
-
-				case <-ctx.Done():
-					fmt.Printf("Stack Deletion Timeout exceeded\n")
-					t.Fail()
-					statusDone = true
-					break
-				}
-
-				if statusDone {
-					break
-				}
-			}
-
-			finish = time.Now()
-
-			dur = finish.Sub(start)
-			fmt.Printf("Stack Deleteion took %f minutes.\n", dur.Minutes())
 		})
 	}
 }

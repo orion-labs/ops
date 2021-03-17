@@ -26,6 +26,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 )
 
 // cacertCmd represents the cacert command
@@ -63,7 +64,7 @@ You're welcome.
 			log.Fatalf("Failed asking for missing parameters")
 		}
 
-		d, err := ops.NewStack(config, nil)
+		d, err := ops.NewStack(config, nil, autoRollback)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
@@ -112,6 +113,26 @@ You're welcome.
 			}
 
 			fmt.Printf("CA certificate written to: %s\n\n", fileName)
+			fmt.Printf("Importing to keychain\n")
+
+			sudo, err := exec.LookPath("sudo")
+			if err != nil {
+				log.Fatalf("'sudo' tool not found: %s", err)
+			}
+
+			cmd := exec.Command(sudo, "security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", "/Library/Keychains/System.keychain", fileName)
+
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Stdin = os.Stdin
+
+			err = cmd.Run()
+			if err != nil {
+				log.Fatalf("error trusting CA cert: %s", err)
+			}
+
+			log.Printf("CA trusted.  You should be good to go.\n")
+
 		}
 	},
 }

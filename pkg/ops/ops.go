@@ -46,6 +46,9 @@ const AWS_REGION_ENV_VAR = "AWS_REGION"
 // DEFAULT_TEMPLATE_URL S3 URL for CloudFormation Template
 const DEFAULT_TEMPLATE_URL = "https://orion-ptt-system.s3.amazonaws.com/orion-ptt-system.yaml"
 
+// BETA_TEMPLATE_URL S3 URL for CloudFormation Template
+const BETA_TEMPLATE_URL = "https://orion-ptt-system-beta.s3.amazonaws.com/orion-ptt-system.yaml"
+
 // DEFAULT_CONFIG_FILE Default config file name.
 const DEFAULT_CONFIG_FILE = ".orion-ptt-system.json"
 
@@ -61,7 +64,7 @@ const DEFAULT_INSTANCE_TYPE = "m5.2xlarge"
 // DEFAULT_VOLUME_SIZE Default EBS Volume size in Gigs.
 const DEFAULT_VOLUME_SIZE = 50
 
-// CONFIG_FILE_TEMPLATE Blanck default config file template for the 'config' command.
+// CONFIG_FILE_TEMPLATE Blank default config file template for the 'config' command.
 const CONFIG_FILE_TEMPLATE = `{
     "stack_name": "",
     "key_name": "",
@@ -74,34 +77,52 @@ const CONFIG_FILE_TEMPLATE = `{
     "instance_name": "orion-ptt-system",
     "instance_type": "m5.2xlarge",
     "create_dns": "true",
-    "create_vpc": "false"
+    "create_vpc": "false",
+		"user_name": "",
+		"license_file": "", 
+		"config_file": ""
 }
-~    `
+`
+
+type SimpleCFTemplate struct {
+	Description string `yaml:"Description"`
+}
+
+type OnpremConfig struct {
+	Keystore  string
+	StackName string
+}
 
 // Stack  Programmatic representation of an Orion PTT System CloudFormation stack.
 type Stack struct {
-	Config     *StackConfig
-	AwsSession *session.Session
+	Config       *StackConfig
+	AwsSession   *session.Session
+	AutoRollback bool
 }
 
 // StackConfig  Config information for an Orion PTT System CloudFormation stack.
 type StackConfig struct {
-	StackName    string `json:"stack_name"`
-	KeyName      string `json:"key_name"`
-	DNSDomain    string `json:"dns_domain"`
-	DNSZoneID    string `json:"dns_zone"`
-	VPCID        string `json:"vpc_id"`
-	VolumeSize   int    `json:"volume_size"`
-	InstanceName string `json:"instance_name"`
-	InstanceType string `json:"instance_type"`
-	AMIID        string `json:"ami_id"`
-	SubnetID     string `json:"subnet_id"`
-	CreateDNS    string `json:"create_dns"`
-	CreateVPC    string `json:"create_vpc"`
+	StackName      string `json:"stack_name"`
+	KeyName        string `json:"key_name"`
+	DNSDomain      string `json:"dns_domain"`
+	DNSZoneID      string `json:"dns_zone"`
+	VPCID          string `json:"vpc_id"`
+	VolumeSize     int    `json:"volume_size"`
+	InstanceName   string `json:"instance_name"`
+	InstanceType   string `json:"instance_type"`
+	AMIID          string `json:"ami_id"`
+	SubnetID       string `json:"subnet_id"`
+	CreateDNS      string `json:"create_dns"`
+	CreateVPC      string `json:"create_vpc"`
+	Username       string `json:"user_name"`
+	LicenseFile    string `json:"license_file"`
+	ConfigTemplate string `json:"config_template"`
+	AdminPassword  string `json:"admin_password"`
+	Beta           bool
 }
 
-// NewStack  Creates a new programmatic representation of a Stack.  Creates the object/interface.  Doesn't actually create it in AWS until you call Create().
-func NewStack(config *StackConfig, awsSession *session.Session) (devenv *Stack, err error) {
+// NewStack  Creates a new programmatic representation of a Stack.  Creates the object/interface.  Doesn't actually create it in AWS until you call Init().
+func NewStack(config *StackConfig, awsSession *session.Session, autorollback bool) (devenv *Stack, err error) {
 	if awsSession == nil {
 		sess, err := DefaultSession()
 		if err != nil {
@@ -112,8 +133,9 @@ func NewStack(config *StackConfig, awsSession *session.Session) (devenv *Stack, 
 	}
 
 	d := Stack{
-		Config:     config,
-		AwsSession: awsSession,
+		Config:       config,
+		AwsSession:   awsSession,
+		AutoRollback: autorollback,
 	}
 
 	devenv = &d
@@ -216,9 +238,18 @@ func (c *StackConfig) AskForMissingParams(keyNeeded bool) (err error) {
 	return err
 }
 
-// Create hits the AWS API to create a Cloudformation stack.
-func (d *Stack) Create() (id string, err error) {
-	client := cloudformation.New(d.AwsSession)
+// Init hits the AWS API to create a Cloudformation stack.
+func (s *Stack) Init() (id string, err error) {
+	client := cloudformation.New(s.AwsSession)
+
+	var templateUrl string
+	if s.Config.Beta {
+		fmt.Printf("----- Using Beta Template -----\n")
+		templateUrl = BETA_TEMPLATE_URL
+	} else {
+		templateUrl = DEFAULT_TEMPLATE_URL
+	}
+
 	input := cloudformation.CreateStackInput{
 		Capabilities: []*string{
 			aws.String("CAPABILITY_NAMED_IAM"),
@@ -227,52 +258,52 @@ func (d *Stack) Create() (id string, err error) {
 		Parameters: []*cloudformation.Parameter{
 			{
 				ParameterKey:   aws.String("ExistingVpcID"),
-				ParameterValue: aws.String(d.Config.VPCID),
+				ParameterValue: aws.String(s.Config.VPCID),
 			},
 			{
 				ParameterKey:   aws.String("ExistingPublicSubnet"),
-				ParameterValue: aws.String(d.Config.SubnetID),
+				ParameterValue: aws.String(s.Config.SubnetID),
 			},
 			{
 				ParameterKey:   aws.String("KeyName"),
-				ParameterValue: aws.String(d.Config.KeyName),
+				ParameterValue: aws.String(s.Config.KeyName),
 			},
 			{
 				ParameterKey:   aws.String("AmiId"),
-				ParameterValue: aws.String(d.Config.AMIID),
+				ParameterValue: aws.String(s.Config.AMIID),
 			},
 			{
 				ParameterKey:   aws.String("InstanceType"),
-				ParameterValue: aws.String(d.Config.InstanceType),
+				ParameterValue: aws.String(s.Config.InstanceType),
 			},
 			{
 				ParameterKey:   aws.String("VolumeSize"),
-				ParameterValue: aws.String(strconv.Itoa(d.Config.VolumeSize)),
+				ParameterValue: aws.String(strconv.Itoa(s.Config.VolumeSize)),
 			},
 			{
 				ParameterKey:   aws.String("InstanceName"),
-				ParameterValue: aws.String(d.Config.InstanceName),
+				ParameterValue: aws.String(s.Config.InstanceName),
 			},
 			{
 				ParameterKey:   aws.String("CreateDNS"),
-				ParameterValue: aws.String(d.Config.CreateDNS),
+				ParameterValue: aws.String(s.Config.CreateDNS),
 			},
 			{
 				ParameterKey:   aws.String("CreateDNSZoneID"),
-				ParameterValue: aws.String(d.Config.DNSZoneID),
+				ParameterValue: aws.String(s.Config.DNSZoneID),
 			},
 			{
 				ParameterKey:   aws.String("CreateDNSDomain"),
-				ParameterValue: aws.String(d.Config.DNSDomain),
+				ParameterValue: aws.String(s.Config.DNSDomain),
 			},
 		},
-		StackName:   aws.String(d.Config.StackName),
-		TemplateURL: aws.String(DEFAULT_TEMPLATE_URL),
+		StackName:   aws.String(s.Config.StackName),
+		TemplateURL: aws.String(templateUrl),
 	}
 
 	output, err := client.CreateStack(&input)
 	if err != nil {
-		err = errors.Wrapf(err, "Failed to create stack %s", d.Config.StackName)
+		err = errors.Wrapf(err, "Failed to create stack %s", s.Config.StackName)
 		return id, err
 	}
 
@@ -287,11 +318,11 @@ func (d *Stack) Create() (id string, err error) {
 }
 
 // Outputs Fetches stack outputs from AWS
-func (d *Stack) Outputs() (outputs []*cloudformation.Output, err error) {
-	client := cloudformation.New(d.AwsSession)
+func (s *Stack) Outputs() (outputs []*cloudformation.Output, err error) {
+	client := cloudformation.New(s.AwsSession)
 
 	input := cloudformation.DescribeStacksInput{
-		StackName: aws.String(d.Config.StackName),
+		StackName: aws.String(s.Config.StackName),
 	}
 
 	info, err := client.DescribeStacks(&input)
@@ -310,11 +341,11 @@ func (d *Stack) Outputs() (outputs []*cloudformation.Output, err error) {
 }
 
 // Params Fetches stack parameters from AWS.
-func (d *Stack) Params() (parameters []*cloudformation.Parameter, err error) {
-	client := cloudformation.New(d.AwsSession)
+func (s *Stack) Params() (parameters []*cloudformation.Parameter, err error) {
+	client := cloudformation.New(s.AwsSession)
 
 	input := cloudformation.DescribeStacksInput{
-		StackName: aws.String(d.Config.StackName),
+		StackName: aws.String(s.Config.StackName),
 	}
 
 	info, err := client.DescribeStacks(&input)
@@ -333,11 +364,11 @@ func (d *Stack) Params() (parameters []*cloudformation.Parameter, err error) {
 }
 
 // Exists Returns true or false depending on whether the stack exists.
-func (d *Stack) Exists() (exists bool) {
-	client := cloudformation.New(d.AwsSession)
+func (s *Stack) Exists() (exists bool) {
+	client := cloudformation.New(s.AwsSession)
 
 	input := cloudformation.DescribeStacksInput{
-		StackName: aws.String(d.Config.StackName),
+		StackName: aws.String(s.Config.StackName),
 	}
 
 	// Will return an error if the stack doesn't exist.
@@ -351,17 +382,17 @@ func (d *Stack) Exists() (exists bool) {
 }
 
 // Status  Fetches stack events from AWS.
-func (d *Stack) Status() (status string, err error) {
-	client := cloudformation.New(d.AwsSession)
+func (s *Stack) Status() (status string, err error) {
+	client := cloudformation.New(s.AwsSession)
 
 	input := cloudformation.DescribeStacksInput{
-		StackName: aws.String(d.Config.StackName),
+		StackName: aws.String(s.Config.StackName),
 	}
 
 	// Will return an error if the stack doesn't exist.
 	output, err := client.DescribeStacks(&input)
 	if err != nil {
-		err = errors.Wrapf(err, "error getting stack %s", d.Config.StackName)
+		err = errors.Wrapf(err, "error getting stack %s", s.Config.StackName)
 		return status, err
 	}
 
@@ -377,17 +408,17 @@ func (d *Stack) Status() (status string, err error) {
 	return status, err
 }
 
-// Destroy Destroys a stack in AWS.
-func (d *Stack) Destroy() (err error) {
-	client := cloudformation.New(d.AwsSession)
+// Delete Destroys a stack in AWS.
+func (s *Stack) Delete() (err error) {
+	client := cloudformation.New(s.AwsSession)
 
 	input := cloudformation.DeleteStackInput{
-		StackName: aws.String(d.Config.StackName),
+		StackName: aws.String(s.Config.StackName),
 	}
 
 	_, err = client.DeleteStack(&input)
 	if err != nil {
-		err = errors.Wrapf(err, "failed deleting stack %s", d.Config.StackName)
+		err = errors.Wrapf(err, "failed deleting stack %s", s.Config.StackName)
 	}
 
 	return err
@@ -412,16 +443,19 @@ func DefaultSession() (awssession *session.Session, err error) {
 	return awssession, err
 }
 
-type SimpleCFTemplate struct {
-	Description string `yaml:"Description"`
-}
-
 // ListStacks Queries the CF Yaml, and AWS, returning a list of stacks with a description that matches the description in the yaml template.
-func (d *Stack) ListStacks() (stacks []*cloudformation.Stack, err error) {
+func (s *Stack) ListStacks() (stacks []*cloudformation.Stack, err error) {
 	stacks = make([]*cloudformation.Stack, 0)
-	resp, err := http.Get(DEFAULT_TEMPLATE_URL)
+	var templateUrl string
+	if s.Config.Beta {
+		templateUrl = BETA_TEMPLATE_URL
+	} else {
+		templateUrl = DEFAULT_TEMPLATE_URL
+	}
+
+	resp, err := http.Get(templateUrl)
 	if err != nil {
-		err = errors.Wrapf(err, "error getting %s", DEFAULT_TEMPLATE_URL)
+		err = errors.Wrapf(err, "error getting %s", templateUrl)
 		return stacks, err
 	}
 
@@ -442,7 +476,7 @@ func (d *Stack) ListStacks() (stacks []*cloudformation.Stack, err error) {
 			return stacks, err
 		}
 
-		client := cloudformation.New(d.AwsSession)
+		client := cloudformation.New(s.AwsSession)
 
 		input := cloudformation.DescribeStacksInput{}
 
@@ -462,3 +496,35 @@ func (d *Stack) ListStacks() (stacks []*cloudformation.Stack, err error) {
 
 	return stacks, err
 }
+
+/*
+
+	After creating the stack, ssh and tail the cloud-init-output.log
+
+	look for:
+		Cloud-init v. 20.4.1-0ubuntu1~18.04.1 running 'modules:final' at Mon, 15 Mar 2021 21:07:19 +0000. Up 20.12 seconds.
+		Cloud-init v. 20.4.1-0ubuntu1~18.04.1 finished at Mon, 15 Mar 2021 21:14:43 +0000. Datasource DataSourceEc2Local.  Up 464.02 seconds
+
+		stream to STDOUT via MultiWriter?
+
+	After the log is done:
+
+		stage license file - done
+
+		generate a JWK for the stack - done
+
+		create config yaml - done
+
+		stage config file - done
+
+		run:  sudo kubectl kots install orion-ptt-system --license-file license.yaml --shared-password letmein --namespace default --config-values config.yaml
+
+	-- wait for pods--
+
+		get cacert
+
+		install cacert
+
+	remove cert on destroy - done
+
+*/

@@ -57,7 +57,7 @@ Looks for the most recent Event for the CloudFormation stack, and returns it alo
 			log.Fatalf("Failed asking for missing parameters")
 		}
 
-		d, err := ops.NewStack(config, nil)
+		d, err := ops.NewStack(config, nil, autoRollback)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
