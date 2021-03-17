@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 )
 
 // cacertCmd represents the cacert command
@@ -115,23 +116,25 @@ You're welcome.
 			fmt.Printf("CA certificate written to: %s\n\n", fileName)
 			fmt.Printf("Importing to keychain\n")
 
-			sudo, err := exec.LookPath("sudo")
-			if err != nil {
-				log.Fatalf("'sudo' tool not found: %s", err)
+			if runtime.GOOS == "darwin" {
+				sudo, err := exec.LookPath("sudo")
+				if err != nil {
+					log.Fatalf("'sudo' tool not found: %s", err)
+				}
+
+				cmd := exec.Command(sudo, "security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", "/Library/Keychains/System.keychain", fileName)
+
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				cmd.Stdin = os.Stdin
+
+				err = cmd.Run()
+				if err != nil {
+					log.Fatalf("error trusting CA cert: %s", err)
+				}
+
+				log.Printf("CA trusted.  You should be good to go.\n")
 			}
-
-			cmd := exec.Command(sudo, "security", "add-trusted-cert", "-d", "-r", "trustRoot", "-k", "/Library/Keychains/System.keychain", fileName)
-
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Stdin = os.Stdin
-
-			err = cmd.Run()
-			if err != nil {
-				log.Fatalf("error trusting CA cert: %s", err)
-			}
-
-			log.Printf("CA trusted.  You should be good to go.\n")
 
 		}
 	},
