@@ -91,6 +91,7 @@ type SimpleCFTemplate struct {
 type OnpremConfig struct {
 	Keystore  string
 	StackName string
+	Domain    string
 }
 
 // Stack  Programmatic representation of an Orion PTT System CloudFormation stack.

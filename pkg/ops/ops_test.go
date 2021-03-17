@@ -19,10 +19,10 @@ package ops
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 )
@@ -84,6 +84,18 @@ func tearDown() {
 
 }
 
+var characters = []rune("abcdef0123456789")
+
+func randSeq(n int) (seq string) {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = characters[rand.Intn(len(characters))]
+	}
+	seq = string(b)
+
+	return seq
+}
+
 func TestListStacks(t *testing.T) {
 	inputs := []struct {
 		name   string
@@ -92,7 +104,7 @@ func TestListStacks(t *testing.T) {
 		{
 			"opstest",
 			StackConfig{
-				StackName:    fmt.Sprintf("opstest-%s", uuid.New().String()),
+				StackName:    fmt.Sprintf("opstest-%s", randSeq(8)),
 				KeyName:      "Nik",
 				DNSDomain:    dnsDomain,
 				DNSZoneID:    dnsZoneID,
@@ -138,7 +150,7 @@ func TestStackCrud(t *testing.T) {
 		{
 			"opstest",
 			StackConfig{
-				StackName:      fmt.Sprintf("opstest-%s", uuid.New().String()),
+				StackName:      fmt.Sprintf("opstest-%s", randSeq(8)),
 				KeyName:        "Nik",
 				DNSDomain:      dnsDomain,
 				DNSZoneID:      dnsZoneID,
@@ -201,7 +213,7 @@ func TestCreateConfig(t *testing.T) {
 		{
 			"opstest",
 			StackConfig{
-				StackName:      fmt.Sprintf("opstest-%s", uuid.New().String()),
+				StackName:      fmt.Sprintf("opstest-%s", randSeq(8)),
 				KeyName:        "Nik",
 				DNSDomain:      dnsDomain,
 				DNSZoneID:      dnsZoneID,

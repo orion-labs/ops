@@ -88,6 +88,7 @@ func (s *Stack) CreateConfig() (content string, err error) {
 	data := OnpremConfig{
 		Keystore:  string(jsonbuf),
 		StackName: s.Config.StackName,
+		Domain:    s.Config.DNSDomain,
 	}
 
 	err = tmpl.Execute(buf, data)
