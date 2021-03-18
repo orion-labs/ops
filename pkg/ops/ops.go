@@ -497,35 +497,3 @@ func (s *Stack) ListStacks() (stacks []*cloudformation.Stack, err error) {
 
 	return stacks, err
 }
-
-/*
-
-	After creating the stack, ssh and tail the cloud-init-output.log
-
-	look for:
-		Cloud-init v. 20.4.1-0ubuntu1~18.04.1 running 'modules:final' at Mon, 15 Mar 2021 21:07:19 +0000. Up 20.12 seconds.
-		Cloud-init v. 20.4.1-0ubuntu1~18.04.1 finished at Mon, 15 Mar 2021 21:14:43 +0000. Datasource DataSourceEc2Local.  Up 464.02 seconds
-
-		stream to STDOUT via MultiWriter?
-
-	After the log is done:
-
-		stage license file - done
-
-		generate a JWK for the stack - done
-
-		create config yaml - done
-
-		stage config file - done
-
-		run:  sudo kubectl kots install orion-ptt-system --license-file license.yaml --shared-password letmein --namespace default --config-values config.yaml
-
-	-- wait for pods--
-
-		get cacert
-
-		install cacert
-
-	remove cert on destroy - done
-
-*/

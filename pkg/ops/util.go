@@ -5,12 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/mitchellh/go-homedir"
 	"github.com/orion-labs/genkeyset/pkg/genkeyset"
 	"github.com/pkg/errors"
 	"io/ioutil"
+	"os"
+	"regexp"
 	"text/template"
 	"time"
 )
+
+const DEFAULT_TEMPLATE_FILE = ".orion-ptt-system.tmpl"
 
 // RetryUntil takes a function, and calls it every 20 seconds until it succeeds.  Useful for polling endpoints in k8s that will eventually start working.  Returns an error if the provided timeoutMinutes elapses.  Otherwise returns the elapsed duration from start to finish.
 func RetryUntil(thing func() (err error), timeoutMinutes int) (elapsed time.Duration, err error) {
@@ -70,9 +78,35 @@ func (s *Stack) CreateConfig() (content string, err error) {
 		return content, err
 	}
 
-	tmplBytes, err := ioutil.ReadFile(s.Config.ConfigTemplate)
+	h, err := homedir.Dir()
 	if err != nil {
-		err = errors.Wrapf(err, "failed reading template file %q", s.Config.ConfigTemplate)
+		err = errors.Wrapf(err, "failed to detect homedir")
+		return content, err
+	}
+
+	templatePath := s.Config.ConfigTemplate
+	defaultPath := fmt.Sprintf("%s/%s", h, DEFAULT_TEMPLATE_FILE)
+
+	isS3, s3Meta := S3Url(templatePath)
+
+	// Look at the templatePath.  If it's an s3 url, fetch it, and stick it in the default location
+	if isS3 {
+		fmt.Printf("Fetching config template from S3.\n")
+		err = FetchTemplateS3(s3Meta, defaultPath)
+		if err != nil {
+			err = errors.Wrapf(err, "failed to fetch template from %s", templatePath)
+			return content, err
+		}
+
+		templatePath = defaultPath
+	} else {
+		fmt.Printf("Using local config template file %s.\n", templatePath)
+	}
+
+	// read template from local file, which might have been written by us, or might have been placed there manually .  Either way we don't really care.  It's just a file at this point.
+	tmplBytes, err := ioutil.ReadFile(templatePath)
+	if err != nil {
+		err = errors.Wrapf(err, "failed reading template file %q", templatePath)
 		return content, err
 	}
 
@@ -100,4 +134,81 @@ func (s *Stack) CreateConfig() (content string, err error) {
 	content = buf.String()
 
 	return content, err
+}
+
+// FetchTemplateS3 fetches the config template from an s3 url.
+func FetchTemplateS3(s3Meta S3Meta, filePath string) (err error) {
+	awsSession, err := DefaultSession()
+	if err != nil {
+		err = errors.Wrapf(err, "failed to create s3 session")
+		return err
+	}
+
+	downloader := s3manager.NewDownloader(awsSession)
+	downloadOptions := &s3.GetObjectInput{
+		Bucket: aws.String(s3Meta.Bucket),
+		Key:    aws.String(s3Meta.Key),
+	}
+
+	outFile, err := os.Create(filePath)
+	if err != nil {
+		err = errors.Wrapf(err, "failed creating file %s", filePath)
+		return err
+	}
+
+	defer outFile.Close()
+
+	_, err = downloader.Download(outFile, downloadOptions)
+	if err != nil {
+		err = errors.Wrapf(err, "download failed")
+		return err
+	}
+
+	return err
+}
+
+// S3Meta a struct for holding metadata for S3 Objects.  There's probably already a struct that holds this, but this is all I need.
+type S3Meta struct {
+	Bucket string
+	Region string
+	Key    string
+	Url    string
+}
+
+// S3Url returns true, and a metadata struct if the url given appears to be in s3
+func S3Url(url string) (ok bool, meta S3Meta) {
+	// Check to see if it's an s3 URL.
+	s3Url := regexp.MustCompile(`https?://(.*)\.s3\.(.*)\.amazonaws.com/?(.*)?`)
+
+	matches := s3Url.FindAllStringSubmatch(url, -1)
+
+	if len(matches) == 0 {
+		return ok, meta
+	}
+
+	match := matches[0]
+
+	if len(match) == 3 {
+		meta = S3Meta{
+			Bucket: match[1],
+			Region: match[2],
+			Url:    url,
+		}
+
+		ok = true
+		return ok, meta
+
+	} else if len(match) == 4 {
+		meta = S3Meta{
+			Bucket: match[1],
+			Region: match[2],
+			Key:    match[3],
+			Url:    url,
+		}
+
+		ok = true
+		return ok, meta
+	}
+
+	return ok, meta
 }

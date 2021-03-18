@@ -142,53 +142,53 @@ func TestListStacks(t *testing.T) {
 
 }
 
-func TestStackCrud(t *testing.T) {
-	inputs := []struct {
-		name   string
-		config StackConfig
-	}{
-		{
-			"opstest",
-			StackConfig{
-				StackName:      fmt.Sprintf("opstest-%s", randSeq(8)),
-				KeyName:        "Nik",
-				DNSDomain:      dnsDomain,
-				DNSZoneID:      dnsZoneID,
-				VPCID:          vpcID,
-				VolumeSize:     volumeSize,
-				InstanceName:   instanceName,
-				InstanceType:   instanceType,
-				AMIID:          amiID,
-				SubnetID:       subnetID,
-				CreateDNS:      "true",
-				CreateVPC:      "false",
-				LicenseFile:    licensefile,
-				ConfigTemplate: templatefile,
-				Username:       orionuser,
-				AdminPassword:  orionpassword,
-			},
-		},
-	}
-
-	for _, tc := range inputs {
-		t.Run(tc.name, func(t *testing.T) {
-			s, err := NewStack(&tc.config, awssession, true)
-			if err != nil {
-				t.Errorf("Failed to create devenv object: %s", err)
-			}
-
-			err = s.Create()
-			if err != nil {
-				t.Errorf("Stack creation failed: %s", err)
-			}
-
-			err = s.Destroy()
-			if err != nil {
-				t.Errorf("Stack deletio failed: %s", err)
-			}
-		})
-	}
-}
+//func TestStackCrud(t *testing.T) {
+//	inputs := []struct {
+//		name   string
+//		config StackConfig
+//	}{
+//		{
+//			"opstest",
+//			StackConfig{
+//				StackName:      fmt.Sprintf("opstest-%s", randSeq(8)),
+//				KeyName:        "Nik",
+//				DNSDomain:      dnsDomain,
+//				DNSZoneID:      dnsZoneID,
+//				VPCID:          vpcID,
+//				VolumeSize:     volumeSize,
+//				InstanceName:   instanceName,
+//				InstanceType:   instanceType,
+//				AMIID:          amiID,
+//				SubnetID:       subnetID,
+//				CreateDNS:      "true",
+//				CreateVPC:      "false",
+//				LicenseFile:    licensefile,
+//				ConfigTemplate: templatefile,
+//				Username:       orionuser,
+//				AdminPassword:  orionpassword,
+//			},
+//		},
+//	}
+//
+//	for _, tc := range inputs {
+//		t.Run(tc.name, func(t *testing.T) {
+//			s, err := NewStack(&tc.config, awssession, true)
+//			if err != nil {
+//				t.Errorf("Failed to create devenv object: %s", err)
+//			}
+//
+//			err = s.Create()
+//			if err != nil {
+//				t.Errorf("Stack creation failed: %s", err)
+//			}
+//
+//			err = s.Destroy()
+//			if err != nil {
+//				t.Errorf("Stack deletio failed: %s", err)
+//			}
+//		})
+//	}
+//}
 
 //func TestSCPFile(t *testing.T) {
 //	hostname := ""
