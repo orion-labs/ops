@@ -39,7 +39,7 @@ jobs:
           command: echo "$OPS_SSH_KEY" | base64 -d > ~/.ssh/id_rsa.ops && chmod 600 ~/.ssh/id_rsa.ops
       - run:
           name: Stage Keyscript
-          command: echo "$KEYSCRIPT" > keyscript.sh && chmod 755 keyscript.sh
+          command: echo "$KEYSCRIPT" | base64 -d > keyscript.sh && chmod 755 keyscript.sh
       - run:
           name: Load SSH Key into Agent
           command: ./keyscript.sh
