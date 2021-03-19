@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 Nik Ogura <nik@orionlabs.io>
+Copyright © 2021 NAME HERE <EMAIL ADDRESS>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,23 +13,23 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package cmd
 
 import (
 	"fmt"
 	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
-	"github.com/spf13/cobra"
 	"log"
+
+	"github.com/spf13/cobra"
 )
 
-// listCmd represents the list command
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List Orion PTT Stacks",
+// templateCmd represents the template command
+var templateCmd = &cobra.Command{
+	Use:   "template",
+	Short: "Dumps the onprem config template for debugging.",
 	Long: `
-List Orion PTT Stacks.
-
-Queries AWS CloudFormation and returns a list of stacks who's description matches that of the CloudForation Yaml Template in S3.'
+Dumps the onprem conifg template for debugging.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := ops.LoadConfig(configPath)
@@ -37,25 +37,36 @@ Queries AWS CloudFormation and returns a list of stacks who's description matche
 			log.Fatalf("failed to read config file at %s: %s", configPath, err)
 		}
 
+		if name == "" {
+			if len(args) > 0 {
+				name = args[0]
+			}
+		}
+
+		if name != "" {
+			config.StackName = name
+		}
+
+		err = config.AskForMissingParams(true)
+		if err != nil {
+			log.Fatalf("Failed asking for missing parameters")
+		}
+
 		s, err := ops.NewStack(config, nil, autoRollback)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
 
-		stacks, err := s.ListStacks()
+		content, err := s.CreateConfig()
 		if err != nil {
-			log.Fatalf("Error listing stacks: %s", err)
+			log.Fatalf("Failed creating onprem config: %s", err)
 		}
 
-		fmt.Printf("Stacks currently registered in CloudFormation:\n")
-
-		for _, s := range stacks {
-			fmt.Printf("  %s\n", *s.StackName)
-		}
-
+		fmt.Printf("%s\n", content)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(templateCmd)
+
 }

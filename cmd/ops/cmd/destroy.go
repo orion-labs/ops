@@ -17,23 +17,20 @@ limitations under the License.
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
+	"github.com/spf13/cobra"
 	"log"
 	"os"
-	"time"
-
-	"github.com/spf13/cobra"
 )
 
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
 	Use:   "destroy [name]",
-	Short: "Destroy an Orion PTT System stack",
+	Short: "Delete an Orion PTT System stack",
 	Long: `
-Destroy an Orion PTT System stack.
+Delete an Orion PTT System stack.
 
 No different from pushing the 'Delete Stack' button in the AWS Cloudformation console.
 
@@ -59,7 +56,7 @@ No different from pushing the 'Delete Stack' button in the AWS Cloudformation co
 			log.Fatalf("Failed asking for missing parameters")
 		}
 
-		d, err := ops.NewStack(config, nil)
+		s, err := ops.NewStack(config, nil, autoRollback)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
@@ -70,49 +67,11 @@ No different from pushing the 'Delete Stack' button in the AWS Cloudformation co
 			os.Exit(0)
 		}
 
-		fmt.Printf("Deleting Stack %q.\n", d.Config.StackName)
-		err = d.Destroy()
+		err = s.Destroy()
 		if err != nil {
-			log.Fatalf("failed destroying stack %s: %s", d.Config.StackName, err)
+			log.Fatalf("Stack deletion failed: %s", err)
 		}
 
-		start := time.Now()
-
-		fmt.Printf("Checking Status\n")
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
-
-		statusDone := false
-
-		for {
-			select {
-			case <-time.After(10 * time.Second):
-				status, err := d.Status()
-				// we don't fail the test if there's an error, cos when the stack is truly deleted, we'll error out when we try to check the status.
-				if err != nil {
-					fmt.Printf("  DELETE_COMPLETE\n")
-					statusDone = true
-					break
-				}
-
-				ts := time.Now()
-				h, m, s := ts.Clock()
-				fmt.Printf("  %02d:%02d:%02d %s\n", h, m, s, status)
-
-			case <-ctx.Done():
-				log.Fatalf("Stack Deletion Timeout exceeded\n")
-			}
-
-			if statusDone {
-				break
-			}
-		}
-
-		finish := time.Now()
-
-		dur := finish.Sub(start)
-		fmt.Printf("Stack Deletion took %f minutes.\n", dur.Minutes())
 	},
 }
 
