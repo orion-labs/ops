@@ -35,6 +35,9 @@ jobs:
           command: sudo apt install -y expect
       - checkout
       - run:
+          name: Stage License
+          command: echo "$ORION_LICENSE_CONTENT" | base64 -D > ~/orionlicense.yaml
+      - run:
           name: Stage SSH Key
           command: echo "$OPS_SSH_KEY" | base64 -d > ~/.ssh/id_rsa.ops && chmod 600 ~/.ssh/id_rsa.ops
       - run:
