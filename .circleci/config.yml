@@ -32,6 +32,12 @@ jobs:
           command: gpg-agent --daemon
       - checkout
       - run:
+          name: Stage SSH Key
+          command: echo "$OPS_SSH_KEY" | base64 -d > ~/.ssh/id_rsa.ops
+      - run:
+          name: Load SSH Key into Agent
+          command: ssh-add .ssh/id_rsa.ops
+      - run:
           name: Stage Signing Key
           command: |
             echo "$SIGNING_PRIVATE_KEY" | base64 -d > obci@orionlabs.asc
