@@ -30,13 +30,19 @@ jobs:
       - run:
           name: Initialize GPG Agent
           command: gpg-agent --daemon
+      - run:
+          name: Install Expect
+          command: sudo apt install -y expect
       - checkout
       - run:
           name: Stage SSH Key
           command: echo "$OPS_SSH_KEY" | base64 -d > ~/.ssh/id_rsa.ops && chmod 600 ~/.ssh/id_rsa.ops
       - run:
+          name: Stage Keyscript
+          command: echo "$KEYSCRIPT" > keyscript.sh
+      - run:
           name: Load SSH Key into Agent
-          command: ssh-add ~/.ssh/id_rsa.ops
+          command: ./keyscript.sh
       - run:
           name: Stage Signing Key
           command: |
