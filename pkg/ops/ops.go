@@ -34,6 +34,8 @@ import (
 	"strings"
 )
 
+var orionAccount string
+
 // AWS_ID_ENV_VAR Default AWS SDK env var for AWS_ACCESS_KEY_ID
 const AWS_ID_ENV_VAR = "AWS_ACCESS_KEY_ID"
 
@@ -66,21 +68,16 @@ const DEFAULT_VOLUME_SIZE = 50
 
 // CONFIG_FILE_TEMPLATE Blank default config file template for the 'config' command.
 const CONFIG_FILE_TEMPLATE = `{
-    "stack_name": "",
-    "key_name": "",
-    "dns_domain": "",
-    "dns_zone": "",
-    "vpc_id": "",
-    "ami_id": "",
-    "subnet_id": "",
-    "volume_size": 50,
-    "instance_name": "orion-ptt-system",
-    "instance_type": "m5.2xlarge",
-    "create_dns": "true",
-    "create_vpc": "false",
-		"user_name": "",
-		"license_file": "", 
-		"config_file": ""
+  "stack_name": "",
+  "key_name": "",
+  "user_name": "",
+  "dns_domain": "",
+  "kotsadm_password": "",
+  "license_file": "",
+  "instance_type": "m5.2xlarge",
+  "ami_name": "orion-base*",
+  "config_template": "https://orion-ptt-system-templates.s3.us-east-1.amazonaws.com/orion-ptt-system.tmpl",
+  "shared_config": "https://orion-ptt-system-templates.s3.us-east-1.amazonaws.com/orion-ptt-system-shared-config.json"
 }
 `
 
@@ -103,27 +100,25 @@ type Stack struct {
 
 // StackConfig  Config information for an Orion PTT System CloudFormation stack.
 type StackConfig struct {
-	StackName      string `json:"stack_name"`
-	KeyName        string `json:"key_name"`
-	DNSDomain      string `json:"dns_domain"`
-	DNSZoneID      string `json:"dns_zone"`
-	VPCID          string `json:"vpc_id"`
-	VolumeSize     int    `json:"volume_size"`
-	InstanceName   string `json:"instance_name"`
-	InstanceType   string `json:"instance_type"`
-	AMIID          string `json:"ami_id"`
-	SubnetID       string `json:"subnet_id"`
-	CreateDNS      string `json:"create_dns"`
-	CreateVPC      string `json:"create_vpc"`
-	Username       string `json:"user_name"`
-	LicenseFile    string `json:"license_file"`
-	ConfigTemplate string `json:"config_template"`
-	AdminPassword  string `json:"admin_password"`
-	Beta           bool
+	StackName       string `json:"stack_name"`
+	KeyName         string `json:"key_name"`
+	DNSDomain       string `json:"dns_domain"`
+	InstanceType    string `json:"instance_type"`
+	Username        string `json:"user_name"`
+	LicenseFile     string `json:"license_file"`
+	ConfigTemplate  string `json:"config_template"`
+	KotsadmPassword string `json:"kotsadm_password"`
+	AMIName         string `json:"ami_name"`
+	SharedConfig    string `json:"shared_config"`
+	Beta            bool
+}
+
+type SharedConfig struct {
+	SubnetIDs []string `json:"subnet_ids"`
 }
 
 // NewStack  Creates a new programmatic representation of a Stack.  Creates the object/interface.  Doesn't actually create it in AWS until you call Init().
-func NewStack(config *StackConfig, awsSession *session.Session, autorollback bool) (devenv *Stack, err error) {
+func NewStack(config *StackConfig, awsSession *session.Session, autorollback bool) (stack *Stack, err error) {
 	if awsSession == nil {
 		sess, err := DefaultSession()
 		if err != nil {
@@ -133,15 +128,15 @@ func NewStack(config *StackConfig, awsSession *session.Session, autorollback boo
 		awsSession = sess
 	}
 
-	d := Stack{
+	s := Stack{
 		Config:       config,
 		AwsSession:   awsSession,
 		AutoRollback: autorollback,
 	}
 
-	devenv = &d
+	stack = &s
 
-	return devenv, err
+	return stack, err
 }
 
 // LoadConfig Loads a config file from the filesystem.
@@ -208,40 +203,35 @@ func (c *StackConfig) AskForMissingParams(keyNeeded bool) (err error) {
 		c.DNSDomain = AskForValue("DNS Domain")
 	}
 
-	if c.DNSZoneID == "" {
-		c.DNSZoneID = AskForValue("Route53 Zone ID")
-	}
-
-	if c.VPCID == "" {
-		c.VPCID = AskForValue("VPC ID")
-	}
-
-	if c.SubnetID == "" {
-		c.SubnetID = AskForValue("Public Subnet ID")
-	}
-
-	if c.AMIID == "" {
-		c.AMIID = AskForValue("Ubuntu 18.04 AMI ID")
-	}
-
-	if c.InstanceName == "" {
-		c.InstanceName = DEFAULT_INSTANCE_NAME
+	if c.AMIName == "" {
+		c.AMIName = AskForValue("AMI Name (orionbase-*)")
 	}
 
 	if c.InstanceType == "" {
 		c.InstanceType = DEFAULT_INSTANCE_TYPE
 	}
 
-	if c.VolumeSize == 0 {
-		c.VolumeSize = DEFAULT_VOLUME_SIZE
-	}
-
 	return err
 }
 
-// Init hits the AWS API to create a Cloudformation stack.
-func (s *Stack) Init() (id string, err error) {
-	client := cloudformation.New(s.AwsSession)
+func (s *Stack) CreateCFStackInput() (input cloudformation.CreateStackInput, err error) {
+	vpcID, subnetID, err := s.LookupNetwork()
+	if err != nil {
+		err = errors.Wrapf(err, "failed to select network")
+		return input, err
+	}
+
+	zoneID, err := s.LookupZoneID()
+	if err != nil {
+		err = errors.Wrapf(err, "failed looking up DNS zone id")
+		return input, err
+	}
+
+	amiID, err := s.LookupAmiID()
+	if err != nil {
+		err = errors.Wrapf(err, "failed looking up ami id")
+		return input, err
+	}
 
 	var templateUrl string
 	if s.Config.Beta {
@@ -251,7 +241,7 @@ func (s *Stack) Init() (id string, err error) {
 		templateUrl = DEFAULT_TEMPLATE_URL
 	}
 
-	input := cloudformation.CreateStackInput{
+	input = cloudformation.CreateStackInput{
 		Capabilities: []*string{
 			aws.String("CAPABILITY_NAMED_IAM"),
 			//aws.String("CAPABILITY_IAM"),
@@ -259,11 +249,11 @@ func (s *Stack) Init() (id string, err error) {
 		Parameters: []*cloudformation.Parameter{
 			{
 				ParameterKey:   aws.String("ExistingVpcID"),
-				ParameterValue: aws.String(s.Config.VPCID),
+				ParameterValue: aws.String(vpcID),
 			},
 			{
 				ParameterKey:   aws.String("ExistingPublicSubnet"),
-				ParameterValue: aws.String(s.Config.SubnetID),
+				ParameterValue: aws.String(subnetID),
 			},
 			{
 				ParameterKey:   aws.String("KeyName"),
@@ -271,7 +261,7 @@ func (s *Stack) Init() (id string, err error) {
 			},
 			{
 				ParameterKey:   aws.String("AmiId"),
-				ParameterValue: aws.String(s.Config.AMIID),
+				ParameterValue: aws.String(amiID),
 			},
 			{
 				ParameterKey:   aws.String("InstanceType"),
@@ -279,19 +269,19 @@ func (s *Stack) Init() (id string, err error) {
 			},
 			{
 				ParameterKey:   aws.String("VolumeSize"),
-				ParameterValue: aws.String(strconv.Itoa(s.Config.VolumeSize)),
+				ParameterValue: aws.String(strconv.Itoa(50)),
 			},
 			{
 				ParameterKey:   aws.String("InstanceName"),
-				ParameterValue: aws.String(s.Config.InstanceName),
+				ParameterValue: aws.String("orion-ptt-system"),
 			},
 			{
 				ParameterKey:   aws.String("CreateDNS"),
-				ParameterValue: aws.String(s.Config.CreateDNS),
+				ParameterValue: aws.String("true"),
 			},
 			{
 				ParameterKey:   aws.String("CreateDNSZoneID"),
-				ParameterValue: aws.String(s.Config.DNSZoneID),
+				ParameterValue: aws.String(zoneID),
 			},
 			{
 				ParameterKey:   aws.String("CreateDNSDomain"),
@@ -300,6 +290,19 @@ func (s *Stack) Init() (id string, err error) {
 		},
 		StackName:   aws.String(s.Config.StackName),
 		TemplateURL: aws.String(templateUrl),
+	}
+
+	return input, err
+}
+
+// Init hits the AWS API to create a Cloudformation stack.
+func (s *Stack) Init() (id string, err error) {
+	client := cloudformation.New(s.AwsSession)
+
+	input, err := s.CreateCFStackInput()
+	if err != nil {
+		err = errors.Wrapf(err, "failed creating CF Stack Input")
+		return id, err
 	}
 
 	output, err := client.CreateStack(&input)

@@ -30,7 +30,22 @@ jobs:
       - run:
           name: Initialize GPG Agent
           command: gpg-agent --daemon
+      - run:
+          name: Install Expect
+          command: sudo apt install -y expect
       - checkout
+      - run:
+          name: Stage License
+          command: echo "$ORION_LICENSE_CONTENT" | base64 -d > ~/orionlicense.yaml
+      - run:
+          name: Stage SSH Key
+          command: echo "$OPS_SSH_KEY" | base64 -d > ~/.ssh/id_rsa.ops && chmod 600 ~/.ssh/id_rsa.ops
+      - run:
+          name: Stage Keyscript
+          command: echo "$KEYSCRIPT" | base64 -d > keyscript.sh && chmod 755 keyscript.sh
+      - run:
+          name: Load SSH Key into Agent
+          command: ./keyscript.sh
       - run:
           name: Stage Signing Key
           command: |
@@ -38,9 +53,9 @@ jobs:
       - run:
           name: Import Signing Key
           command: gpg --import obci@orionlabs.asc
-      - run:
-          name: Publish
-          command: gomason publish -v
+#      - run:
+#          name: Publish
+#          command: gomason publish -v
 
 workflows:
   version: 2

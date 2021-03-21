@@ -17,32 +17,34 @@ limitations under the License.
 package ops
 
 import (
+	"encoding/base64"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
 	"testing"
 )
 
+var tmpDir string
 var awssession *session.Session
-var dnsZoneID string
 var dnsDomain string
-var vpcID string
+var zoneID string
 var volumeSize int
-var instanceName string
 var instanceType string
-var amiID string
-var subnetID string
-var sshPort int
-var sshAddress string
-var sshServerRunning bool
+var amiName string
 var licensefile string
 var templatefile string
 var orionuser string
 var orionpassword string
+var sharedconfig string
+var vpc string
+var network string
 
 func TestMain(m *testing.M) {
 	setUp()
@@ -55,6 +57,12 @@ func TestMain(m *testing.M) {
 }
 
 func setUp() {
+	d, err := os.MkdirTemp("", "ops")
+	if err != nil {
+		log.Fatalf("failed creating tmp dir: %s", err)
+	}
+
+	tmpDir = d
 
 	if awssession == nil {
 		sess, err := DefaultSession()
@@ -67,21 +75,25 @@ func setUp() {
 
 	TESTING = true
 	dnsDomain = os.Getenv("ORION_DNS_DOMAIN")
-	dnsZoneID = os.Getenv("ORION_DNS_ZONE_ID")
-	vpcID = os.Getenv("ORION_VPC_ID")
-	amiID = os.Getenv("ORION_AMI_ID")
-	subnetID = os.Getenv("ORION_SUBNET")
+	amiName = os.Getenv("ORION_AMI_NAME")
 	volumeSize = DEFAULT_VOLUME_SIZE
-	instanceName = DEFAULT_INSTANCE_NAME
 	instanceType = DEFAULT_INSTANCE_TYPE
 	licensefile = os.Getenv("ORION_LICENSE")
 	templatefile = os.Getenv("ORION_TEMPLATE")
 	orionuser = os.Getenv("ORION_USER")
 	orionpassword = os.Getenv("ORION_ADMIN_PASSWORD")
+	zoneID = os.Getenv("ORION_ZONE_ID")
+	vpc = os.Getenv("ORION_VPC")
+	orionAccount = os.Getenv("ORION_ACCOUNT")
+	network = os.Getenv("ORION_NETWORK")
+
+	sharedconfig = os.Getenv("ORION_SHARED_CONFIG")
 }
 
 func tearDown() {
-
+	if _, err := os.Stat(tmpDir); err != nil {
+		_ = os.RemoveAll(tmpDir)
+	}
 }
 
 var characters = []rune("abcdef0123456789")
@@ -107,15 +119,9 @@ func TestListStacks(t *testing.T) {
 				StackName:    fmt.Sprintf("opstest-%s", randSeq(8)),
 				KeyName:      "Nik",
 				DNSDomain:    dnsDomain,
-				DNSZoneID:    dnsZoneID,
-				VPCID:        vpcID,
-				VolumeSize:   volumeSize,
-				InstanceName: instanceName,
 				InstanceType: instanceType,
-				AMIID:        amiID,
-				SubnetID:     subnetID,
-				CreateDNS:    "true",
-				CreateVPC:    "false",
+				SharedConfig: sharedconfig,
+				AMIName:      amiName,
 			},
 		},
 	}
@@ -142,53 +148,48 @@ func TestListStacks(t *testing.T) {
 
 }
 
-//func TestStackCrud(t *testing.T) {
-//	inputs := []struct {
-//		name   string
-//		config StackConfig
-//	}{
-//		{
-//			"opstest",
-//			StackConfig{
-//				StackName:      fmt.Sprintf("opstest-%s", randSeq(8)),
-//				KeyName:        "Nik",
-//				DNSDomain:      dnsDomain,
-//				DNSZoneID:      dnsZoneID,
-//				VPCID:          vpcID,
-//				VolumeSize:     volumeSize,
-//				InstanceName:   instanceName,
-//				InstanceType:   instanceType,
-//				AMIID:          amiID,
-//				SubnetID:       subnetID,
-//				CreateDNS:      "true",
-//				CreateVPC:      "false",
-//				LicenseFile:    licensefile,
-//				ConfigTemplate: templatefile,
-//				Username:       orionuser,
-//				AdminPassword:  orionpassword,
-//			},
-//		},
-//	}
-//
-//	for _, tc := range inputs {
-//		t.Run(tc.name, func(t *testing.T) {
-//			s, err := NewStack(&tc.config, awssession, true)
-//			if err != nil {
-//				t.Errorf("Failed to create devenv object: %s", err)
-//			}
-//
-//			err = s.Create()
-//			if err != nil {
-//				t.Errorf("Stack creation failed: %s", err)
-//			}
-//
-//			err = s.Destroy()
-//			if err != nil {
-//				t.Errorf("Stack deletio failed: %s", err)
-//			}
-//		})
-//	}
-//}
+func TestStackCrud(t *testing.T) {
+	stackName := fmt.Sprintf("opstest-%s", randSeq(8))
+	inputs := []struct {
+		name   string
+		config StackConfig
+	}{
+		{
+			"opstest",
+			StackConfig{
+				StackName:       stackName,
+				KeyName:         "Nik",
+				DNSDomain:       dnsDomain,
+				InstanceType:    instanceType,
+				LicenseFile:     licensefile,
+				ConfigTemplate:  templatefile,
+				Username:        orionuser,
+				KotsadmPassword: orionpassword,
+				SharedConfig:    sharedconfig,
+				AMIName:         amiName,
+			},
+		},
+	}
+
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := NewStack(&tc.config, awssession, true)
+			if err != nil {
+				t.Errorf("Failed to create devenv object: %s", err)
+			}
+
+			err = s.Create()
+			if err != nil {
+				t.Errorf("Stack creation failed: %s", err)
+			}
+
+			err = s.Destroy()
+			if err != nil {
+				t.Errorf("Stack deletio failed: %s", err)
+			}
+		})
+	}
+}
 
 //func TestSCPFile(t *testing.T) {
 //	hostname := ""
@@ -204,7 +205,6 @@ func TestListStacks(t *testing.T) {
 //}
 
 func TestCreateConfig(t *testing.T) {
-
 	inputs := []struct {
 		name     string
 		config   StackConfig
@@ -216,18 +216,12 @@ func TestCreateConfig(t *testing.T) {
 				StackName:      fmt.Sprintf("opstest-%s", randSeq(8)),
 				KeyName:        "Nik",
 				DNSDomain:      dnsDomain,
-				DNSZoneID:      dnsZoneID,
-				VPCID:          vpcID,
-				VolumeSize:     volumeSize,
-				InstanceName:   instanceName,
 				InstanceType:   instanceType,
-				AMIID:          amiID,
-				SubnetID:       subnetID,
-				CreateDNS:      "true",
-				CreateVPC:      "false",
 				Username:       orionuser,
 				LicenseFile:    licensefile,
 				ConfigTemplate: templatefile,
+				SharedConfig:   sharedconfig,
+				AMIName:        amiName,
 			},
 			`apiVersion: kots.io/v1beta1
 kind: ConfigValues
@@ -285,6 +279,231 @@ spec:
 			} else {
 				t.Error("failed to parse spec out of config")
 			}
+		})
+	}
+}
+
+func TestCreateCFStackInput(t *testing.T) {
+	sharedConfigFile := fmt.Sprintf("%s/shared.json", tmpDir)
+
+	encodedContent := os.Getenv("ORION_SHARED_CONFIG")
+
+	decoded, err := base64.StdEncoding.DecodeString(encodedContent)
+	if err != nil {
+		t.Errorf("failed to decode shared config content: %s", err)
+	}
+
+	err = ioutil.WriteFile(sharedConfigFile, decoded, 0644)
+	if err != nil {
+		t.Errorf("Failed writing shared config file: %s", err)
+	}
+
+	stackName := fmt.Sprintf("opstest-%s", randSeq(8))
+
+	inputs := []struct {
+		name   string
+		config StackConfig
+		input  cloudformation.CreateStackInput
+	}{
+		{
+			"explicit network",
+			StackConfig{
+				StackName:      stackName,
+				KeyName:        "Nik",
+				DNSDomain:      dnsDomain,
+				InstanceType:   instanceType,
+				Username:       orionuser,
+				LicenseFile:    licensefile,
+				ConfigTemplate: templatefile,
+				SharedConfig:   sharedconfig,
+				AMIName:        amiName,
+			},
+			cloudformation.CreateStackInput{
+				Capabilities: []*string{aws.String("CAPABILITY_NAMED_IAM")},
+				Parameters: []*cloudformation.Parameter{
+					{
+						ParameterKey:   aws.String("ExistingVpcID"),
+						ParameterValue: aws.String(vpc),
+					},
+					{
+						ParameterKey:   aws.String("ExistingPublicSubnet"),
+						ParameterValue: aws.String(network),
+					},
+					{
+						ParameterKey:   aws.String("KeyName"),
+						ParameterValue: aws.String("Nik"),
+					},
+					{
+						ParameterKey:   aws.String("AmiId"),
+						ParameterValue: aws.String("ami-0839205d907fd0eab"),
+					},
+					{
+						ParameterKey:   aws.String("InstanceType"),
+						ParameterValue: aws.String("m5.2xlarge"),
+					},
+					{
+						ParameterKey:   aws.String("VolumeSize"),
+						ParameterValue: aws.String("50"),
+					},
+					{
+						ParameterKey:   aws.String("InstanceName"),
+						ParameterValue: aws.String("orion-ptt-system"),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNS"),
+						ParameterValue: aws.String("true"),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNSZoneID"),
+						ParameterValue: aws.String(zoneID),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNSDomain"),
+						ParameterValue: aws.String(dnsDomain),
+					},
+				},
+				StackName:   aws.String(stackName),
+				TemplateURL: aws.String("https://orion-ptt-system.s3.amazonaws.com/orion-ptt-system.yaml"),
+			},
+		},
+		{
+			"local file",
+			StackConfig{
+				StackName:      stackName,
+				KeyName:        "Nik",
+				DNSDomain:      dnsDomain,
+				InstanceType:   instanceType,
+				Username:       orionuser,
+				LicenseFile:    licensefile,
+				ConfigTemplate: templatefile,
+				SharedConfig:   sharedConfigFile,
+				AMIName:        amiName,
+			},
+			cloudformation.CreateStackInput{
+				Capabilities: []*string{aws.String("CAPABILITY_NAMED_IAM")},
+				Parameters: []*cloudformation.Parameter{
+					{
+						ParameterKey:   aws.String("ExistingVpcID"),
+						ParameterValue: aws.String(vpc),
+					},
+					{
+						ParameterKey:   aws.String("ExistingPublicSubnet"),
+						ParameterValue: aws.String(network),
+					},
+					{
+						ParameterKey:   aws.String("KeyName"),
+						ParameterValue: aws.String("Nik"),
+					},
+					{
+						ParameterKey:   aws.String("AmiId"),
+						ParameterValue: aws.String("ami-0839205d907fd0eab"),
+					},
+					{
+						ParameterKey:   aws.String("InstanceType"),
+						ParameterValue: aws.String("m5.2xlarge"),
+					},
+					{
+						ParameterKey:   aws.String("VolumeSize"),
+						ParameterValue: aws.String("50"),
+					},
+					{
+						ParameterKey:   aws.String("InstanceName"),
+						ParameterValue: aws.String("orion-ptt-system"),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNS"),
+						ParameterValue: aws.String("true"),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNSZoneID"),
+						ParameterValue: aws.String(zoneID),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNSDomain"),
+						ParameterValue: aws.String(dnsDomain),
+					},
+				},
+				StackName:   aws.String(stackName),
+				TemplateURL: aws.String("https://orion-ptt-system.s3.amazonaws.com/orion-ptt-system.yaml"),
+			},
+		},
+		{
+			"s3 file",
+			StackConfig{
+				StackName:      stackName,
+				KeyName:        "Nik",
+				DNSDomain:      dnsDomain,
+				InstanceType:   instanceType,
+				Username:       orionuser,
+				LicenseFile:    licensefile,
+				ConfigTemplate: templatefile,
+				SharedConfig:   os.Getenv("ORION_SHARED_CONFIG_URL"),
+				AMIName:        amiName,
+			},
+			cloudformation.CreateStackInput{
+				Capabilities: []*string{aws.String("CAPABILITY_NAMED_IAM")},
+				Parameters: []*cloudformation.Parameter{
+					{
+						ParameterKey:   aws.String("ExistingVpcID"),
+						ParameterValue: aws.String(vpc),
+					},
+					{
+						ParameterKey:   aws.String("ExistingPublicSubnet"),
+						ParameterValue: aws.String(network),
+					},
+					{
+						ParameterKey:   aws.String("KeyName"),
+						ParameterValue: aws.String("Nik"),
+					},
+					{
+						ParameterKey:   aws.String("AmiId"),
+						ParameterValue: aws.String("ami-0839205d907fd0eab"),
+					},
+					{
+						ParameterKey:   aws.String("InstanceType"),
+						ParameterValue: aws.String("m5.2xlarge"),
+					},
+					{
+						ParameterKey:   aws.String("VolumeSize"),
+						ParameterValue: aws.String("50"),
+					},
+					{
+						ParameterKey:   aws.String("InstanceName"),
+						ParameterValue: aws.String("orion-ptt-system"),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNS"),
+						ParameterValue: aws.String("true"),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNSZoneID"),
+						ParameterValue: aws.String(zoneID),
+					},
+					{
+						ParameterKey:   aws.String("CreateDNSDomain"),
+						ParameterValue: aws.String(dnsDomain),
+					},
+				},
+				StackName:   aws.String(stackName),
+				TemplateURL: aws.String("https://orion-ptt-system.s3.amazonaws.com/orion-ptt-system.yaml"),
+			},
+		},
+	}
+
+	for _, tc := range inputs {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := NewStack(&tc.config, awssession, true)
+			if err != nil {
+				t.Errorf("Failed to create stacks object: %s", err)
+			}
+
+			input, err := s.CreateCFStackInput()
+			if err != nil {
+				t.Errorf("Failed selecting network.")
+			}
+
+			assert.Equal(t, tc.input, input, "Looked up VPC doesn't match expectations")
+
 		})
 	}
 }
