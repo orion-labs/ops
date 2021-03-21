@@ -19,6 +19,7 @@ import (
 )
 
 const DEFAULT_TEMPLATE_FILE = ".orion-ptt-system.tmpl"
+const DEFAULT_NETWORK_CONFIG_FILE = ".orion-ptt-system-network.json"
 
 // RetryUntil takes a function, and calls it every 20 seconds until it succeeds.  Useful for polling endpoints in k8s that will eventually start working.  Returns an error if the provided timeoutMinutes elapses.  Otherwise returns the elapsed duration from start to finish.
 func RetryUntil(thing func() (err error), timeoutMinutes int) (elapsed time.Duration, err error) {
@@ -92,7 +93,7 @@ func (s *Stack) CreateConfig() (content string, err error) {
 	// Look at the templatePath.  If it's an s3 url, fetch it, and stick it in the default location
 	if isS3 {
 		fmt.Printf("Fetching config template from S3.\n")
-		err = FetchTemplateS3(s3Meta, defaultPath)
+		err = FetchFileS3(s3Meta, defaultPath)
 		if err != nil {
 			err = errors.Wrapf(err, "failed to fetch template from %s", templatePath)
 			return content, err
@@ -136,8 +137,8 @@ func (s *Stack) CreateConfig() (content string, err error) {
 	return content, err
 }
 
-// FetchTemplateS3 fetches the config template from an s3 url.
-func FetchTemplateS3(s3Meta S3Meta, filePath string) (err error) {
+// FetchFileS3 fetches the config template from an s3 url.
+func FetchFileS3(s3Meta S3Meta, filePath string) (err error) {
 	awsSession, err := DefaultSession()
 	if err != nil {
 		err = errors.Wrapf(err, "failed to create s3 session")
@@ -211,4 +212,14 @@ func S3Url(url string) (ok bool, meta S3Meta) {
 	}
 
 	return ok, meta
+}
+
+// StringInSlice returns true if the given string is in the given slice
+func StringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
