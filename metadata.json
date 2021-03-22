@@ -7,10 +7,12 @@
   "building": {
     "targets": [
       {
-        "name": "darwin/amd64"
+        "name": "darwin/amd64",
+        "ldflags": "-X github.com/orion-labs/orion-ptt-system-ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
       },
       {
-        "name": "linux/amd64"
+        "name": "linux/amd64",
+        "ldflags": "-X github.com/orion-labs/orion-ptt-system-ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
       }
     ],
     "extras": [
