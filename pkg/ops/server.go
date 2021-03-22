@@ -141,11 +141,18 @@ func GetStacks() (stacks []DisplayStack, err error) {
 			case "CA":
 				e := PingEndpoint(*o.OutputValue)
 				if e != nil {
-					api = "Not Ready"
+					caHost = "Not Ready"
 				}
 				caHost = fmt.Sprintf("https://%s/v1/pki/ca/pem", *o.OutputValue)
 			}
 		}
+
+		//e := PingEndpoint(fmt.Sprintf("http://%s:8800", address))
+		//if e != nil {
+		//	kotsadm = "Not Ready"
+		//} else {
+		//	kotsadm = fmt.Sprintf("http://%s:8800", address)
+		//}
 
 		display := DisplayStack{
 			Account:  account,
