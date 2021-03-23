@@ -308,7 +308,7 @@ func (s *Stack) PollKotsadm(sshClient *SshProgClient) (err error) {
 func (s *Stack) KotsInstall(sshClient *SshProgClient) (err error) {
 	start := time.Now()
 
-	cmd := fmt.Sprintf("sudo -i kubectl kots install orion-ptt-system --license-file /home/%s/license.yaml --shared-password letmein --namespace default --config-values /home/%s/config.yaml", s.Config.Username, s.Config.Username)
+	cmd := fmt.Sprintf("sudo -i kubectl kots install orion-ptt-system --license-file /home/%s/license.yaml --namespace default --config-values /home/%s/config.yaml --shared-password %q", s.Config.Username, s.Config.Username, s.Config.KotsadmPassword)
 
 	fmt.Printf("Installing Kots app with the following command:\n\n  %s\n\nThis will take a couple minutes.\n\n", cmd)
 

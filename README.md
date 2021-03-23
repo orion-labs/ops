@@ -14,20 +14,38 @@ Place a file at `~/.orion-ptt-system.json`.  This file should look like:
 
     {
         "stack_name": "<your stack name>",
-        "key_name": "<your SSH key name>",
-        "dns_domain": "<your DNS domain>",
-        "dns_zone": "<your Rout53 Domain Zone ID>",
-        "vpc_id": "<your VPC ID>",
-        "volume_size": 50,
-        "instance_name": "orion-ptt-system",
-        "instance_type": "m5.2xlarge",
-        "ami_id": "<ubuntu 18.04 AMI ID>",
-        "subnet_id": "<your public subnet ID>",
-        "create_dns": "true",
-        "create_vpc": "false"
+        "key_name": "<your ssh key name>",
+        "user_name": "<your user name>",
+        "dns_domain": "<your dns domain>",
+        "instance_type": "<ec2 instance type you wish to use>",
+        "ami_name": "<ami name prefix.  We look up the lastest version.>",
+        "kotsadm_password": "<your kotsadm password>",
+        "license_file": "</path/to/your/orion.license.yaml>",
+        "config_template": "<path/to/your/config/template>",
+        "shared_config": "<path/to/your/shared/config>"
     }
 
 If you don't have a config file, or if your config is missing any required entries, you will be asked to fill in the missing values.
+
+## Config Template
+
+This is a yaml representation of the values entered in the 'Config Screen' of kotsadm.
+
+It has to match the format of the current Config Screen else errors will occur.
+
+Contact Orion for information on how to dump this from a running Orion PTT System environment.
+
+## Shared Config
+
+This is a JSON file that looks something like:
+
+    {
+        "subnet_ids": ["subnet-1", "subnet-2"]
+    }
+
+The `ops` tool will look up subnets available in your account and will return the first one it finds out of this list together with the matching VPC id to populate the CF template.  This is useful when you have teams leveraging multiple accounts.  Its use means the users don't have to know or care which subnets are appropriate to use in each account.  
+
+We assume you have only 1 subnet in each account that you want to use for Orion PTT System instances.  If you have more than one subnet in an account, we use the first one we find, which may or may not be consistent.  We just use the first matching account AWS returns to us.
 
 ## Commands
 
@@ -57,4 +75,8 @@ For all commands, the final argument is the name of the stack.  If you do not su
 
 Provided you have a golang SDK installed, run the following command to build and install from source.  Note the trailing `/...`.
 
-    go get github.com/orion-labs/orion-ptt-system-ops/...
+    go get github.com/orion-labs/orion-ptt-system-ops
+
+    cd $GOPATH/src/github.com/orion-labs/orion-ptt-system-ops
+
+	go install -ldflags "-X github.com/orion-labs/orion-ptt-system-ops/pkg/ops.orionAccount=<YOUR AWS ACCOUNT NUMBER>" ./...

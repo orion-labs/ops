@@ -57,7 +57,7 @@ Looks for the most recent Event for the CloudFormation stack, and returns it alo
 			log.Fatalf("Failed asking for missing parameters")
 		}
 
-		d, err := ops.NewStack(config, nil, autoRollback)
+		s, err := ops.NewStack(config, nil, autoRollback)
 		if err != nil {
 			log.Fatalf("Failed to create devenv object: %s", err)
 		}
@@ -68,15 +68,15 @@ Looks for the most recent Event for the CloudFormation stack, and returns it alo
 			os.Exit(0)
 		}
 
-		status, err := d.Status()
+		status, err := s.Status()
 		if err != nil {
-			log.Fatalf("Error getting status for %s: %s", d.Config.StackName, err)
+			log.Fatalf("Error getting status for %s: %s", s.Config.StackName, err)
 		}
 
-		fmt.Printf("Status for stack %q: %s\n", d.Config.StackName, status)
+		fmt.Printf("Status for stack %q: %s\n", s.Config.StackName, status)
 
 		fmt.Printf("Stack Outputs:\n")
-		outputs, err := d.Outputs()
+		outputs, err := s.Outputs()
 		if err != nil {
 			log.Fatalf("Error fetching Stack Outputs: %s", err)
 		}
