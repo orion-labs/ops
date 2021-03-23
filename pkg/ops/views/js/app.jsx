@@ -27,7 +27,6 @@ class LoggedIn extends React.Component {
         super(props);
         this.state = {
             stacks: [],
-            stackDetails: {},
         };
 
         this.serverRequest = this.serverRequest.bind(this);
@@ -42,7 +41,7 @@ class LoggedIn extends React.Component {
     }
 
     serverRequest() {
-        fetch("http://localhost:3000/api/stacks")
+        return fetch("http://localhost:3000/api/stacks")
             .then(res => res.json())
             .then(res => {
                 // asynchronous function.
@@ -54,22 +53,8 @@ class LoggedIn extends React.Component {
             .catch(err => {console.log("ahhhhhh!", err)})
     }
 
-    getStackDetails(name) {
-        fetch(`http://localhost:3000/api/stacks/${name}`
-        )
-        .then( res => JSON.stringify(res))
-        .then( jsonResults => {
-            let tempDetails = this.state.stackDetails
-            tempDetails[name] = jsonResults
-            this.setState({ stackDetails: tempDetails })
-        })
-    }
-
-    async componentDidMount() {
-        await this.serverRequest()
-        this.state.stacks.forEach( stack => {
-            this.getStackDetails(stack.name)
-        })
+    componentDidMount() {
+        this.serverRequest()
     }
 
     render() {
@@ -87,7 +72,6 @@ class LoggedIn extends React.Component {
                             return <Stack
                                 key={`stack-${stack.name}`}
                                 stack={stack}
-                                stackDetails={this.state.stackDetails[stack.name]}
                             />;
                         })}
                     </div>
@@ -101,8 +85,21 @@ class Stack extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            stacks: []
+            stack: {name: '', created: '', address: '', account: '', cfstatus: '', kotsadm: '', login: '', api: '', ca: ''},
         };
+    }
+
+    componentDidMount() {
+        this.getStackDetails(this.props.stack.name)
+    }
+
+    getStackDetails = (name) => {
+        fetch(`http://localhost:3000/api/stacks/${name}`
+        )
+        .then( res => res.json())
+        .then( jsonResults => {
+            this.setState({ stack: jsonResults })
+        })
     }
 
     render() {
@@ -113,14 +110,14 @@ class Stack extends React.Component {
                         {this.props.stack.name}{" "}
                     </div>
                     <div className="panel-body">
-                        Created: {this.props.stackDetails.created}<br/>
-                        Address: {this.props.stackDetails.address}<br/>
-                        Account: {this.props.stackDetails.account}<br/>
-                        CloudFormation: {this.props.stackDetails.cfstatus}<br/>
-                        Kotsadm: <a href={this.props.stackDetails.kotsadm}>{this.props.stackDetails.kotsadm}</a> <br/>
-                        Login: <a href={this.props.stackDetails.login}>{this.props.stackDetails.login}</a><br/>
-                        API: <a href={this.props.stackDetails.api}>{this.props.stackDetails.api}</a><br/>
-                        CA: <a href={this.props.stackDetails.ca}>{this.props.stackDetails.ca}</a><br/>
+                        Created: {this.state.stack.created}<br/>
+                        Address: {this.state.stack.address}<br/>
+                        Account: {this.state.stack.account}<br/>
+                        CloudFormation: {this.state.stack.cfstatus}<br/>
+                        Kotsadm: <a href={this.state.stack.kotsadm}>{this.state.stack.kotsadm}</a> <br/>
+                        Login: <a href={this.state.stack.login}>{this.state.stack.login}</a><br/>
+                        API: <a href={this.state.stack.api}>{this.state.stack.api}</a><br/>
+                        CA: <a href={this.state.stack.ca}>{this.state.stack.ca}</a><br/>
                     </div>
                     <div className="panel-footer">
                     </div>
