@@ -97,56 +97,28 @@ class LoggedIn extends React.Component {
     }
 }
 
-class Stack extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = {
-            liked: "",
-            stacks: []
-        };
-        this.like = this.like.bind(this);
-        this.serverRequest = this.serverRequest.bind(this);
-    }
-
-    like() {
-        let stack = this.props.stack;
-        this.serverRequest(stack);
-    }
-    serverRequest(stack) {
-        $.post(
-            "http://localhost:3000/api/stacks/status`/" + stack.name,
-            { like: 1 },
-            res => {
-                console.log("res... ", res);
-                this.setState({ liked: "Liked!", stacks: res });
-                this.props.stacks = res;
-            }
-        );
-    }
-
-    render() {
-        return (
-            <div className="col-lg-6">
-                <div className="panel panel-default">
-                    <div className="panel-heading">
-                        {this.props.stack.name}{" "}
-                    </div>
-                    <div className="panel-body">
-                        Created: {this.props.stackDetails.created}<br/>
-                        Address: {this.props.stackDetails.address}<br/>
-                        Account: {this.props.stackDetails.account}<br/>
-                        CloudFormation: {this.props.stackDetails.cfstatus}<br/>
-                        Kotsadm: <a href={this.props.stackDetails.kotsadm}>{this.props.stackDetails.kotsadm}</a> <br/>
-                        Login: <a href={this.props.stackDetails.login}>{this.props.stackDetails.login}</a><br/>
-                        API: <a href={this.props.stackDetails.api}>{this.props.stackDetails.api}</a><br/>
-                        CA: <a href={this.props.stackDetails.ca}>{this.props.stackDetails.ca}</a><br/>
-                    </div>
-                    <div className="panel-footer">
-                    </div>
+function Stack(props) {
+    return (
+        <div className="col-lg-6">
+            <div className="panel panel-default">
+                <div className="panel-heading">
+                    {props.stack.name}{" "}
+                </div>
+                <div className="panel-body">
+                    Created: {props.stackDetails.created}<br/>
+                    Address: {props.stackDetails.address}<br/>
+                    Account: {props.stackDetails.account}<br/>
+                    CloudFormation: {props.stackDetails.cfstatus}<br/>
+                    Kotsadm: <a href={props.stackDetails.kotsadm}>{props.stackDetails.kotsadm}</a> <br/>
+                    Login: <a href={props.stackDetails.login}>{props.stackDetails.login}</a><br/>
+                    API: <a href={props.stackDetails.api}>{props.stackDetails.api}</a><br/>
+                    CA: <a href={props.stackDetails.ca}>{props.stackDetails.ca}</a><br/>
+                </div>
+                <div className="panel-footer">
                 </div>
             </div>
-        )
-    }
+        </div>
+    )
 }
 
 
