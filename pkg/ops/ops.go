@@ -32,6 +32,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var orionAccount string
@@ -410,6 +411,33 @@ func (s *Stack) Status() (status string, err error) {
 	status = *stack.StackStatus
 
 	return status, err
+}
+
+// Status  Fetches stack events from AWS.
+func (s *Stack) Created() (created *time.Time, err error) {
+	client := cloudformation.New(s.AwsSession)
+
+	input := cloudformation.DescribeStacksInput{
+		StackName: aws.String(s.Config.StackName),
+	}
+
+	// Will return an error if the stack doesn't exist.
+	output, err := client.DescribeStacks(&input)
+	if err != nil {
+		err = errors.Wrapf(err, "error getting stack %s", s.Config.StackName)
+		return created, err
+	}
+
+	if len(output.Stacks) != 1 {
+		err = errors.New(ERR_TO_MANY_STACKS)
+		return created, err
+	}
+
+	stack := output.Stacks[0]
+
+	created = stack.CreationTime
+
+	return created, err
 }
 
 // Delete Destroys a stack in AWS.

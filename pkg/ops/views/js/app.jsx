@@ -42,7 +42,7 @@ class LoggedIn extends React.Component {
     }
 
     serverRequest() {
-        fetch("http://localhost:3000/api/systems")
+        fetch("http://localhost:3000/api/stacks")
             .then(res => res.json())
             .then(res => {
                 // asynchronous function.
@@ -55,7 +55,7 @@ class LoggedIn extends React.Component {
     }
 
     getStackDetails(name) {
-        fetch(`http://localhost:3000/api/stacks/name/${name}`
+        fetch(`http://localhost:3000/api/stacks/${name}`
         )
         .then( res => JSON.stringify(res))
         .then( jsonResults => {
@@ -101,27 +101,8 @@ class Stack extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            liked: "",
             stacks: []
         };
-        this.like = this.like.bind(this);
-        this.serverRequest = this.serverRequest.bind(this);
-    }
-
-    like() {
-        let stack = this.props.stack;
-        this.serverRequest(stack);
-    }
-    serverRequest(stack) {
-        $.post(
-            "http://localhost:3000/api/stacks/status`/" + stack.name,
-            { like: 1 },
-            res => {
-                console.log("res... ", res);
-                this.setState({ liked: "Liked!", stacks: res });
-                this.props.stacks = res;
-            }
-        );
     }
 
     render() {
