@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"time"
 )
 
 //go:embed views
@@ -29,7 +30,6 @@ func RunServer(address string, port int) (err error) {
 	}
 
 	api.GET("/systems", SystemHandler)
-	//api.POST("/jokes/like/:jokeID", LikeJoke)
 
 	router.Use(Serve("/", content))
 
@@ -128,6 +128,7 @@ func GetStacks() (stacks []DisplayStack, err error) {
 				e := PingEndpoint(*o.OutputValue)
 				if e != nil {
 					login = "Not Ready"
+					break
 				}
 				login = fmt.Sprintf("https://%s", *o.OutputValue)
 
@@ -135,6 +136,7 @@ func GetStacks() (stacks []DisplayStack, err error) {
 				e := PingEndpoint(*o.OutputValue)
 				if e != nil {
 					api = "Not Ready"
+					break
 				}
 				api = fmt.Sprintf("https://%s", *o.OutputValue)
 
@@ -142,24 +144,24 @@ func GetStacks() (stacks []DisplayStack, err error) {
 				e := PingEndpoint(*o.OutputValue)
 				if e != nil {
 					caHost = "Not Ready"
+					break
 				}
 				caHost = fmt.Sprintf("https://%s/v1/pki/ca/pem", *o.OutputValue)
 			}
 		}
 
-		//e := PingEndpoint(fmt.Sprintf("http://%s:8800", address))
-		//if e != nil {
-		//	kotsadm = "Not Ready"
-		//} else {
-		//	kotsadm = fmt.Sprintf("http://%s:8800", address)
-		//}
+		kotsadm := "Not Ready"
+		e := PingEndpoint(fmt.Sprintf("%s:8800", address))
+		if e == nil {
+			kotsadm = fmt.Sprintf("http://%s:8800", address)
+		}
 
 		display := DisplayStack{
 			Account:  account,
 			Name:     *stack.StackName,
 			CFStatus: *stack.StackStatus,
 			Address:  address,
-			Kotsadm:  fmt.Sprintf("http://%s:8800", address),
+			Kotsadm:  kotsadm,
 			Api:      api,
 			Login:    login,
 			CA:       caHost,
@@ -191,23 +193,11 @@ type DisplayStack struct {
 
 func PingEndpoint(address string) (err error) {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	_, err = http.Get(fmt.Sprintf("https://%s", address))
+	client := http.Client{
+		Timeout: time.Second,
+	}
+
+	_, err = client.Get(fmt.Sprintf("https://%s", address))
 
 	return err
 }
-
-//func LikeJoke(c *gin.Context) {
-//	if jokeid, err := strconv.Atoi(c.Param("jokeID")); err == nil {
-//		for i:=0; i < len(jokes); i++ {
-//			if jokes[i].ID == jokeid {
-//				jokes[i].Likes += 1
-//			}
-//		}
-//
-//		c.JSON(http.StatusOK, &jokes)
-//	} else {
-//		c.AbortWithStatus(http.StatusNotFound)
-//	}
-//}
-
-// stack name , account, statuses,
