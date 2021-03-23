@@ -41,7 +41,7 @@ class LoggedIn extends React.Component {
     }
 
     serverRequest() {
-        return fetch("http://localhost:3000/api/stacks")
+        return fetch(window.location.href + "api/stacks")
             .then(res => res.json())
             .then(res => {
                 // asynchronous function.
@@ -94,7 +94,7 @@ class Stack extends React.Component {
     }
 
     getStackDetails = (name) => {
-        fetch(`http://localhost:3000/api/stacks/${name}`
+        fetch(window.location.href + `api/stacks/${name}`
         )
         .then( res => res.json())
         .then( jsonResults => {
