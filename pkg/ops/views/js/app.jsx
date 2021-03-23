@@ -110,7 +110,7 @@ class Stack extends React.Component {
             <div className="col-lg-6">
                 <div className="panel panel-default">
                     <div className="panel-heading">
-                        {this.props.stack.name}{" "}
+                        {this.props.stack.name}
                     </div>
                     <div className="panel-body">
                         Created: {this.props.stackDetails.created}<br/>
