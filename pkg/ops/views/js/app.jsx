@@ -26,7 +26,8 @@ class LoggedIn extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            stacks: []
+            stacks: [],
+            stackDetails: {},
         };
 
         this.serverRequest = this.serverRequest.bind(this);
@@ -53,8 +54,22 @@ class LoggedIn extends React.Component {
             .catch(err => {console.log("ahhhhhh!", err)})
     }
 
-    componentDidMount() {
-        this.serverRequest();
+    getStackDetails(name) {
+        fetch(`http://localhost:3000/api/stacks/name/${name}`
+        )
+        .then( res => JSON.stringify(res))
+        .then( jsonResults => {
+            let tempDetails = this.state.stackDetails
+            tempDetails[name] = jsonResults
+            this.setState({ stackDetails: tempDetails })
+        })
+    }
+
+    async componentDidMount() {
+        await this.serverRequest()
+        this.state.stacks.forEach( stack => {
+            this.getStackDetails(stack.name)
+        })
     }
 
     render() {
@@ -62,14 +77,18 @@ class LoggedIn extends React.Component {
             <div className="container">
                 <br />
                 <span className="pull-right">
-          <a onClick={this.logout}>Log out</a>
-        </span>
+                    <a onClick={this.logout}>Log out</a>
+                </span>
                 <h2>Orion PTT System Instances</h2>
                 <p></p>
                 <div className="row">
                     <div className="container">
                         {this.state.stacks.map(function(stack, i) {
-                            return <Stack key={i} stack={stack} />;
+                            return <Stack
+                                key={`stack-${stack.name}`}
+                                stack={stack}
+                                stackDetails={this.state.stackDetails[stack.name]}
+                            />;
                         })}
                     </div>
                 </div>
@@ -113,14 +132,14 @@ class Stack extends React.Component {
                         {this.props.stack.name}{" "}
                     </div>
                     <div className="panel-body">
-                        Created: {this.props.stack.created}<br/>
-                        Address: {this.props.stack.address}<br/>
-                        Account: {this.props.stack.account}<br/>
-                        CloudFormation: {this.props.stack.cfstatus}<br/>
-                        Kotsadm: <a href={this.props.stack.kotsadm}>{this.props.stack.kotsadm}</a> <br/>
-                        Login: <a href={this.props.stack.login}>{this.props.stack.login}</a><br/>
-                        API: <a href={this.props.stack.api}>{this.props.stack.api}</a><br/>
-                        CA: <a href={this.props.stack.ca}>{this.props.stack.ca}</a><br/>
+                        Created: {this.props.stackDetails.created}<br/>
+                        Address: {this.props.stackDetails.address}<br/>
+                        Account: {this.props.stackDetails.account}<br/>
+                        CloudFormation: {this.props.stackDetails.cfstatus}<br/>
+                        Kotsadm: <a href={this.props.stackDetails.kotsadm}>{this.props.stackDetails.kotsadm}</a> <br/>
+                        Login: <a href={this.props.stackDetails.login}>{this.props.stackDetails.login}</a><br/>
+                        API: <a href={this.props.stackDetails.api}>{this.props.stackDetails.api}</a><br/>
+                        CA: <a href={this.props.stackDetails.ca}>{this.props.stackDetails.ca}</a><br/>
                     </div>
                     <div className="panel-footer">
                     </div>
