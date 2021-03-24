@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"io/fs"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -31,6 +32,7 @@ func RunServer(address string, port int) (err error) {
 
 	api.GET("/stacks", StacksHandler)
 	api.GET("/stacks/:stackName", StackHandler)
+	api.GET("/stacks/:stackName/ca", CaHandler)
 
 	router.Use(Serve("/", content))
 
@@ -85,6 +87,33 @@ func StackHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, stack)
+}
+
+func CaHandler(c *gin.Context) {
+	stackName := c.Param("stackName")
+	if stackName == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+	}
+
+	stack, err := GetStack(stackName)
+	if err != nil {
+		c.AbortWithStatus(http.StatusNotFound)
+	}
+
+	caUrl := stack.CA
+
+	resp, err := http.Get(caUrl)
+	if err != nil {
+		c.AbortWithStatus(http.StatusNotFound)
+	}
+	defer resp.Body.Close()
+
+	certBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+	}
+
+	c.Data(200, "application/pkix-cert", certBytes)
 }
 
 func GetStacks() (stacks []DisplayStack, err error) {

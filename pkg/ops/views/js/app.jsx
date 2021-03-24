@@ -117,7 +117,7 @@ class Stack extends React.Component {
                         Kotsadm: <a href={this.state.stack.kotsadm}>{this.state.stack.kotsadm}</a> <br/>
                         Login: <a href={this.state.stack.login}>{this.state.stack.login}</a><br/>
                         API: <a href={this.state.stack.api}>{this.state.stack.api}</a><br/>
-                        CA: <a href={this.state.stack.ca}>{this.state.stack.ca}</a><br/>
+                        CA: <a download={`CA-${this.state.stack.name}.pem`} href={window.location.href + `api/stacks/${this.state.stack.name}/ca`}>{this.state.stack.ca}</a><br/>
                     </div>
                     <div className="panel-footer">
                     </div>
