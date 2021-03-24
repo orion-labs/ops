@@ -96,11 +96,12 @@ class Stack extends React.Component {
     }
 
     componentDidMount() {
-        this.getStackDetails(this.props.stack.name)
-        var intervalID = window.setInterval(this.getStackDetails(this.props.stack.name), 30000)
+        this.getStackDetails()
+        var intervalID = window.setInterval(this.getStackDetails, 30000)
     }
 
-    getStackDetails = (name) => {
+    getStackDetails = () => {
+        const { name } = this.props.stack
         fetch(window.location.href + `api/stacks/${name}`
         )
         .then( res => res.json())
