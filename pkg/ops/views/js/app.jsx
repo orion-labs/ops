@@ -89,8 +89,15 @@ class Stack extends React.Component {
         };
     }
 
+    destroyStack = (name) => {
+        if (window.confirm("Destroy Stack " + name + "?")){
+            fetch(window.location.href + `api/stacks/${name}`, {method: 'DELETE'})
+        }
+    }
+
     componentDidMount() {
         this.getStackDetails(this.props.stack.name)
+        var intervalID = window.setInterval(this.getStackDetails(this.props.stack.name), 30000)
     }
 
     getStackDetails = (name) => {
@@ -120,6 +127,7 @@ class Stack extends React.Component {
                         CA: <a download={`CA-${this.state.stack.name}.pem`} href={window.location.href + `api/stacks/${this.state.stack.name}/ca`}>{this.state.stack.ca}</a><br/>
                     </div>
                     <div className="panel-footer">
+                        <button type="button" class="btn btn-dark" onClick={() => {this.destroyStack(this.state.stack.name)}}> Destroy </button>
                     </div>
                 </div>
             </div>

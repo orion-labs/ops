@@ -33,6 +33,7 @@ func RunServer(address string, port int) (err error) {
 	api.GET("/stacks", StacksHandler)
 	api.GET("/stacks/:stackName", StackHandler)
 	api.GET("/stacks/:stackName/ca", CaHandler)
+	api.DELETE("/stacks/:stackName", DeleteHandler)
 
 	router.Use(Serve("/", content))
 
@@ -114,6 +115,40 @@ func CaHandler(c *gin.Context) {
 	}
 
 	c.Data(200, "application/pkix-cert", certBytes)
+}
+
+func DeleteHandler(c *gin.Context) {
+	stackName := c.Param("stackName")
+	if stackName == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+	}
+
+	err := DeleteStack(stackName)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func DeleteStack(stackName string) (err error) {
+	config, err := LoadConfig("")
+	if err != nil {
+		err = errors.Wrapf(err, "failed to load default config file")
+		return err
+	}
+
+	config.StackName = stackName
+
+	s, err := NewStack(config, nil, true)
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to create devenv object")
+		return err
+	}
+
+	err = s.Delete()
+
+	return err
 }
 
 func GetStacks() (stacks []DisplayStack, err error) {
