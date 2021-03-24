@@ -62,7 +62,7 @@ class LoggedIn extends React.Component {
             <div className="container">
                 <br />
                 <span className="pull-right">
-                    <a onClick={this.logout}>Log out</a>
+                    {/*<a onClick={this.logout}>Log out</a>*/}
                 </span>
                 <h2>Orion PTT System Instances</h2>
                 <p></p>
