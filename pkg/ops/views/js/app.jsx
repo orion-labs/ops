@@ -55,6 +55,7 @@ class LoggedIn extends React.Component {
 
     componentDidMount() {
         this.serverRequest()
+        window.setInterval(this.serverRequest, 30000)
     }
 
     render() {
