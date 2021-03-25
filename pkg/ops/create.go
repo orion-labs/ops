@@ -361,7 +361,7 @@ func (s *Stack) StageLicense(sshClient *SshProgClient) (err error) {
 	_, err = RetryUntil(func() (err error) {
 		err = sshClient.SCPFile(licenseContent, "license.yaml")
 		return err
-	}, 15)
+	}, 5)
 
 	fmt.Printf("License staged to /home/%s/license.yaml\n", s.Config.Username)
 
