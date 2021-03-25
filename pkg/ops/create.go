@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+const ERR_SSH_GENERAL = "SSH error.  Is your ssh-agent running?  Keys loaded?  Can't bootstrap Orion PTT System without it."
+
 var TESTING bool
 
 // Create Instantiates an instance of the Orion PTT System in AWS via CloudFormation
@@ -146,14 +148,16 @@ func (s *Stack) Create() (err error) {
 
 	err = s.StageLicense(sshClient)
 	if err != nil {
-		err = errors.Wrapf(err, "failed staging license file")
+		//err = errors.Wrapf(err, "failed staging license file")
+		err = errors.New(ERR_SSH_GENERAL)
 		return err
 	}
 
 	// Create and stage the config file.
 	err = s.StageConfig(sshClient)
 	if err != nil {
-		err = errors.Wrapf(err, "failed staging kots config")
+		//err = errors.Wrapf(err, "failed staging kots config")
+		err = errors.New(ERR_SSH_GENERAL)
 		return err
 	}
 
