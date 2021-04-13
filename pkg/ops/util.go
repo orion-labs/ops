@@ -100,6 +100,23 @@ func (s *Stack) CreateConfig() (content string, err error) {
 		}
 
 		templatePath = defaultPath
+	} else if isGit(templatePath) {
+		repo, path := SplitRepoPath(templatePath)
+		fmt.Printf("pulling templates from git.  Repo: %s Path: %s\n", repo, path)
+		gitContent, err := GitContent(repo, path)
+		if err != nil {
+			err = errors.Wrapf(err, "error cloning %s", repo)
+			return content, err
+		}
+
+		err = ioutil.WriteFile(defaultPath, gitContent, 0644)
+		if err != nil {
+			err = errors.Wrapf(err, "failed to write file to %s", defaultPath)
+			return content, err
+		}
+
+		templatePath = defaultPath
+
 	} else {
 		fmt.Printf("Using local config template file %s.\n", templatePath)
 	}

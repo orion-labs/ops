@@ -128,9 +128,9 @@ func (s *Stack) ReadSharedConfig() (config SharedConfig, err error) {
 	}
 
 	defaultPath := fmt.Sprintf("%s/%s", h, DEFAULT_NETWORK_CONFIG_FILE)
-	path := s.Config.SharedConfig
+	configPath := s.Config.SharedConfig
 
-	isS3, s3Meta := S3Url(path)
+	isS3, s3Meta := S3Url(configPath)
 
 	// Look at the path.  If it's an s3 url, fetch it, and stick it in the default location
 	if isS3 {
@@ -141,18 +141,36 @@ func (s *Stack) ReadSharedConfig() (config SharedConfig, err error) {
 			return config, err
 		}
 
-		path = defaultPath
+		configPath = defaultPath
+	} else if isGit(configPath) {
+		repo, path := SplitRepoPath(configPath)
+
+		fmt.Printf("pulling shared config from git.  Repo: %s Path: %s\n", repo, path)
+
+		gitContent, err := GitContent(repo, path)
+		if err != nil {
+			err = errors.Wrapf(err, "error cloning %s", repo)
+			return config, err
+		}
+
+		err = ioutil.WriteFile(defaultPath, gitContent, 0644)
+		if err != nil {
+			err = errors.Wrapf(err, "failed to write file to %s", defaultPath)
+			return config, err
+		}
+
+		configPath = defaultPath
 	}
 
 	// This handles a literal json blob in the config.  If it unmarshals, call it good and send it back
-	e := json.Unmarshal([]byte(path), &config)
+	e := json.Unmarshal([]byte(configPath), &config)
 	if e == nil {
 		fmt.Printf("Shared config from JSON literal.\n")
 		return config, err
 	}
 
 	// This handles a base64 encoded literal json blob.  If what we have decodes and unmarshals, call it good and send it back.
-	decoded, err := base64.StdEncoding.DecodeString(path)
+	decoded, err := base64.StdEncoding.DecodeString(configPath)
 	if err == nil {
 		e := json.Unmarshal(decoded, &config)
 		if e == nil {
@@ -161,11 +179,11 @@ func (s *Stack) ReadSharedConfig() (config SharedConfig, err error) {
 		}
 	}
 
-	fmt.Printf("Shared config from local file %s.\n", path)
+	fmt.Printf("Shared config from local file %s.\n", configPath)
 
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		err = errors.Wrapf(err, "failed reading template file %q", path)
+		err = errors.Wrapf(err, "failed reading template file %q", configPath)
 		return config, err
 	}
 

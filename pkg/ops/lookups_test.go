@@ -120,7 +120,7 @@ func TestLookupNetwork(t *testing.T) {
 
 			actualVpc, actualSubnet, err := s.LookupNetwork()
 			if err != nil {
-				t.Errorf("Failed selecting network.")
+				t.Errorf("Failed selecting network: %s", err)
 			}
 
 			expectedVpc := tc.vpc

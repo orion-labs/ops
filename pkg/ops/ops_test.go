@@ -45,6 +45,7 @@ var orionpassword string
 var sharedconfig string
 var vpc string
 var network string
+var ami string
 
 func TestMain(m *testing.M) {
 	setUp()
@@ -86,6 +87,7 @@ func setUp() {
 	vpc = os.Getenv("ORION_VPC")
 	orionAccount = os.Getenv("ORION_ACCOUNT")
 	network = os.Getenv("ORION_NETWORK")
+	ami = os.Getenv("ORION_AMI")
 
 	sharedconfig = os.Getenv("ORION_SHARED_CONFIG")
 }
@@ -335,7 +337,7 @@ func TestCreateCFStackInput(t *testing.T) {
 					},
 					{
 						ParameterKey:   aws.String("AmiId"),
-						ParameterValue: aws.String("ami-0839205d907fd0eab"),
+						ParameterValue: aws.String(ami),
 					},
 					{
 						ParameterKey:   aws.String("InstanceType"),
@@ -396,7 +398,7 @@ func TestCreateCFStackInput(t *testing.T) {
 					},
 					{
 						ParameterKey:   aws.String("AmiId"),
-						ParameterValue: aws.String("ami-0839205d907fd0eab"),
+						ParameterValue: aws.String(ami),
 					},
 					{
 						ParameterKey:   aws.String("InstanceType"),
@@ -457,7 +459,7 @@ func TestCreateCFStackInput(t *testing.T) {
 					},
 					{
 						ParameterKey:   aws.String("AmiId"),
-						ParameterValue: aws.String("ami-0839205d907fd0eab"),
+						ParameterValue: aws.String(ami),
 					},
 					{
 						ParameterKey:   aws.String("InstanceType"),
