@@ -53,9 +53,9 @@ jobs:
       - run:
           name: Import Signing Key
           command: gpg --import obci@orionlabs.asc
-#      - run:
-#          name: Publish
-#          command: gomason publish -v
+      - run:
+          name: Publish
+          command: gomason publish -v --test-timeout 30m
 
 workflows:
   version: 2
