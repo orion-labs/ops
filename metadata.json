@@ -37,13 +37,13 @@
         "checksums": true
       },
       {
-        "src": "ops_darwin_amd64",
+        "src": "orion-ptt-system-ops_darwin_amd64",
         "dst": "{{.Repository}}/{{.Name}}/{{.Version}}/darwin/amd64/{{.Name}}",
         "sig": true,
         "checksums": true
       },
       {
-        "src": "ops_linux_amd64",
+        "src": "orion-ptt-system-ops_linux_amd64",
         "dst": "{{.Repository}}/{{.Name}}/{{.Version}}/linux/amd64/{{.Name}}",
         "sig": true,
         "checksums": true

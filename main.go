@@ -14,7 +14,7 @@
 package main
 
 import (
-	"github.com/orion-labs/orion-ptt-system-ops/cmd/ops/cmd"
+	"github.com/orion-labs/orion-ptt-system-ops/cmd"
 )
 
 func main() {
