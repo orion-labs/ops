@@ -32,7 +32,12 @@ var serverCmd = &cobra.Command{
 Run the Orion PTT System Instance Management Server.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := ops.RunServer(address, port)
+		server, err := ops.NewOpsServer(address, port)
+		if err != nil {
+			log.Fatalf("Failed to create server instance.")
+		}
+
+		err = server.Run()
 		if err != nil {
 			log.Fatalf("Server failed to run: %s", err)
 		}

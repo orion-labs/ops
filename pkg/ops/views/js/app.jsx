@@ -90,9 +90,9 @@ class Stack extends React.Component {
         };
     }
 
-    destroyStack = (name) => {
+    destroyStack = (account, name) => {
         if (window.confirm("Destroy Stack " + name + "?")){
-            fetch(window.location.href + `api/stacks/${name}`, {method: 'DELETE'})
+            fetch(window.location.href + `api/stacks/${account}/${name}`, {method: 'DELETE'})
         }
     }
 
@@ -103,7 +103,8 @@ class Stack extends React.Component {
 
     getStackDetails = () => {
         const { name } = this.props.stack
-        fetch(window.location.href + `api/stacks/${name}`
+        const { account } = this.props.stack
+        fetch(window.location.href + `api/stacks/${account}/${name}`
         )
         .then( res => res.json())
         .then( jsonResults => {
@@ -129,7 +130,7 @@ class Stack extends React.Component {
                         CA: <a download={`CA-${this.state.stack.name}.pem`} href={window.location.href + `api/stacks/${this.state.stack.name}/ca`}>{this.state.stack.ca}</a><br/>
                     </div>
                     <div className="panel-footer">
-                        <button type="button" class="btn btn-dark" onClick={() => {this.destroyStack(this.state.stack.name)}}> Destroy </button>
+                        <button type="button" class="btn btn-dark" onClick={() => {this.destroyStack(this.state.stack.account, this.state.stack.name)}}> Destroy </button>
                     </div>
                 </div>
             </div>

@@ -3,21 +3,112 @@ package ops
 import (
 	"crypto/tls"
 	"embed"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"io/fs"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
 //go:embed views
 var content embed.FS
 
-func RunServer(address string, port int) (err error) {
+type OnpremDetails struct {
+	Account     string `json:"account" binding:"required"`
+	Kubernetes  string `json:"kubernetes" binding:"required"`
+	Kotsadm     string `json:"kotsadm" binding:"required"`
+	CFStatus    string `json:"cfstatus" binding:"required"`
+	Name        string `json:"name" binding:"required"`
+	Address     string `json:"address" binding:"required"`
+	Datastore   string `json:"datastore" binding:"required"`
+	EventStream string `json:"eventstream" binding:"required"`
+	Media       string `json:"media" binding:"required"`
+	Login       string `json:"login" binding:"required"`
+	Api         string `json:"api" binding:"required"`
+	CDN         string `json:"cdn" binding:"required"`
+	CA          string `json:"ca" binding:"required"`
+	Created     string `json:"created" binding:"required"`
+}
+
+type Account struct {
+	Number    string `json:"account_number"`
+	KeyId     string `json:"aws_access_key_id"`
+	SecretKey string `json:"aws_secret_access_key"`
+	Region    string `json:"aws_region"`
+}
+
+type OpsServer struct {
+	Address  string
+	Port     int
+	Accounts []Account
+}
+
+const ACCOUNT_ENV_VAR = "AWS_ACCOUNT_CREDENTIALS"
+
+func init() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetLevel(log.DebugLevel)
+}
+
+func NewOpsServer(address string, port int) (server *OpsServer, err error) {
+	accounts := make([]Account, 0)
+
+	if os.Getenv(ACCOUNT_ENV_VAR) != "" {
+		decoded, err := base64.StdEncoding.DecodeString(os.Getenv(ACCOUNT_ENV_VAR))
+		if err != nil {
+			err = errors.Wrapf(err, "failed to decode base64 encoded creds from environment")
+			return server, err
+		}
+
+		err = json.Unmarshal(decoded, &accounts)
+		if err != nil {
+			err = errors.Wrapf(err, "Failed unmarshalling json in %s", ACCOUNT_ENV_VAR)
+			return server, err
+		}
+
+		log.Debugf("Using Credentials from %s", ACCOUNT_ENV_VAR)
+
+	} else {
+		log.Debugf("Using Default Credentials")
+		sess, err := DefaultSession()
+		if err != nil {
+			log.Fatalf("failed creating aws session: %s", err)
+		}
+
+		// This is a horrible hack that just gets the account from the caller - i.e. the aws creds of whomever started the server
+		output, err := sts.New(sess).GetCallerIdentity(&sts.GetCallerIdentityInput{})
+		if err != nil {
+			err = errors.Wrapf(err, "Error getting caller identity")
+			return server, err
+		}
+
+		account := Account{
+			Number: *output.Account,
+		}
+
+		accounts = append(accounts, account)
+	}
+
+	server = &OpsServer{
+		Address:  address,
+		Port:     port,
+		Accounts: accounts,
+	}
+
+	return server, err
+}
+
+func (s *OpsServer) Run() (err error) {
 	router := gin.Default()
 
 	api := router.Group("/api")
@@ -30,14 +121,14 @@ func RunServer(address string, port int) (err error) {
 		})
 	}
 
-	api.GET("/stacks", StacksHandler)
-	api.GET("/stacks/:stackName", StackHandler)
-	api.GET("/stacks/:stackName/ca", CaHandler)
-	api.DELETE("/stacks/:stackName", DeleteHandler)
+	api.GET("/stacks", s.InstancesHandler)
+	api.GET("/stacks/:account/:stackName", s.SingleInstanceHandler)
+	api.GET("/stacks/:account/:stackName/ca", s.InstanceCaHandler)
+	api.DELETE("/stacks/:account/:stackName", s.InstanceDeleteHandler)
 
-	router.Use(Serve("/", content))
+	router.Use(s.Serve("/", content))
 
-	addr := fmt.Sprintf("%s:%d", address, port)
+	addr := fmt.Sprintf("%s:%d", s.Address, s.Port)
 	fmt.Printf("Server starting on %s.\n", addr)
 
 	err = router.Run(addr)
@@ -45,7 +136,7 @@ func RunServer(address string, port int) (err error) {
 	return err
 }
 
-func Serve(urlPrefix string, efs embed.FS) gin.HandlerFunc {
+func (s *OpsServer) Serve(urlPrefix string, efs embed.FS) gin.HandlerFunc {
 	// the embedded filesystem has a 'views/' at the top level.  We wanna strip this so we can treat the root of the views directory as the web root.
 	fsys, err := fs.Sub(efs, "views")
 	if err != nil {
@@ -63,40 +154,57 @@ func Serve(urlPrefix string, efs embed.FS) gin.HandlerFunc {
 	}
 }
 
-func StacksHandler(c *gin.Context) {
+// InstancesHandler returns json with all instances, though the instances themselves will only have account numbers and names.  Details need to be fetched later.  This is done to speed response time on the webpage.
+func (s *OpsServer) InstancesHandler(c *gin.Context) {
 	c.Header("Content-Type", "application/json")
 
-	stacks, err := GetStacks()
+	instances, err := s.GetInstances()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, make([]DisplayStack, 0))
+		c.JSON(http.StatusInternalServerError, make([]OnpremDetails, 0))
+		log.Errorf("Error in instances handler: %s", err)
+		return
 	}
 
-	c.JSON(http.StatusOK, stacks)
+	c.JSON(http.StatusOK, instances)
 }
 
-func StackHandler(c *gin.Context) {
+// SingleInstanceHandler returns details for a particular instance.
+func (s *OpsServer) SingleInstanceHandler(c *gin.Context) {
 	c.Header("Content-Type", "application/json")
+
+	account := c.Param("account")
+	if account == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+	}
 
 	stackName := c.Param("stackName")
 	if stackName == "" {
 		c.AbortWithStatus(http.StatusNotFound)
 	}
 
-	stack, err := GetStack(stackName)
+	deets, err := s.GetDetails(account, stackName)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, DisplayStack{})
+		c.JSON(http.StatusInternalServerError, OnpremDetails{})
+		log.Errorf("Error in single instance handler: %s", err)
+		return
 	}
 
-	c.JSON(http.StatusOK, stack)
+	c.JSON(http.StatusOK, deets)
 }
 
-func CaHandler(c *gin.Context) {
+// InstanceCaHandler fetches the CA cert for a specific instance and sends it back to the client.
+func (s *OpsServer) InstanceCaHandler(c *gin.Context) {
+	account := c.Param("account")
+	if account == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+	}
+
 	stackName := c.Param("stackName")
 	if stackName == "" {
 		c.AbortWithStatus(http.StatusNotFound)
 	}
 
-	stack, err := GetStack(stackName)
+	stack, err := s.GetDetails(account, stackName)
 	if err != nil {
 		c.AbortWithStatus(http.StatusNotFound)
 	}
@@ -117,13 +225,19 @@ func CaHandler(c *gin.Context) {
 	c.Data(200, "application/pkix-cert", certBytes)
 }
 
-func DeleteHandler(c *gin.Context) {
+// InstanceDeleteHandler deletes a specific instance
+func (s *OpsServer) InstanceDeleteHandler(c *gin.Context) {
+	account := c.Param("account")
+	if account == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+	}
+
 	stackName := c.Param("stackName")
 	if stackName == "" {
 		c.AbortWithStatus(http.StatusNotFound)
 	}
 
-	err := DeleteStack(stackName)
+	err := s.DeleteStack(account, stackName)
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 	}
@@ -131,98 +245,139 @@ func DeleteHandler(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func DeleteStack(stackName string) (err error) {
-	config, err := LoadConfig("")
-	if err != nil {
-		err = errors.Wrapf(err, "failed to load default config file")
-		return err
-	}
+// GetStack retrieves a configured stack object for a given account and name based on credentials we have available.
+func (s *OpsServer) GetStack(accountNumber string, stackName string) (stack *Stack, err error) {
+	log.Debugf("Generating Stack object for account: %q name: %q", accountNumber, stackName)
 
-	config.StackName = stackName
+	var account *Account
 
-	s, err := NewStack(config, nil, true)
-	if err != nil {
-		err = errors.Wrapf(err, "Failed to create devenv object")
-		return err
-	}
-
-	err = s.Delete()
-
-	return err
-}
-
-func GetStacks() (stacks []DisplayStack, err error) {
-	config, err := LoadConfig("")
-	if err != nil {
-		err = errors.Wrapf(err, "failed to load default config file")
-		return stacks, err
-	}
-
-	s, err := NewStack(config, nil, true)
-	if err != nil {
-		err = errors.Wrapf(err, "Failed to create devenv object")
-		return stacks, err
-	}
-
-	stacklist, err := s.ListStacks()
-	if err != nil {
-		err = errors.Wrapf(err, "Error listing stacks")
-		return stacks, err
-	}
-
-	stacks = make([]DisplayStack, 0)
-
-	for _, stack := range stacklist {
-
-		display := DisplayStack{
-			Name: *stack.StackName,
+	for _, a := range s.Accounts {
+		log.Debugf("Checking %s against %s", a.Number, accountNumber)
+		if a.Number == accountNumber {
+			log.Debugf("Setting accoutn as %s", a.Number)
+			account = &a
+			break
 		}
-
-		stacks = append(stacks, display)
 	}
 
-	return stacks, err
-}
-
-func GetStack(stackName string) (stack DisplayStack, err error) {
-	config, err := LoadConfig("")
-	if err != nil {
-		err = errors.Wrapf(err, "failed to load default config file")
+	if account == nil {
+		err = errors.New(fmt.Sprintf("Failed to retrieve Account Object for %q", accountNumber))
 		return stack, err
 	}
 
-	config.StackName = stackName
+	log.Debugf("Account is %s", account.Number)
 
-	s, err := NewStack(config, nil, true)
-	if err != nil {
-		err = errors.Wrapf(err, "Failed to create devenv object")
-		return stack, err
+	config := StackConfig{
+		StackName: stackName,
 	}
 
-	// This is a horrible hack that just gets the account from the caller - i.e. the aws creds of whomever started the server
-	output, err := sts.New(s.AwsSession).GetCallerIdentity(&sts.GetCallerIdentityInput{})
+	var awsSession *session.Session
+
+	// If we haven't done any special account and credential provisioning, get them in the normal fashion
+	if account.KeyId == "" && account.SecretKey == "" {
+		log.Debugf("Using DefaultSession")
+		awsSession, err = DefaultSession()
+		if err != nil {
+			err = errors.Wrapf(err, "failed to get default session")
+			return stack, err
+		}
+	} else { // otherwise, use what was explicitly provisioned
+		log.Debugf("Creating Session from static creds.  ID: %s", account.KeyId)
+		awsSession, err = session.NewSession(&aws.Config{
+			Region:      aws.String(account.Region),
+			Credentials: credentials.NewStaticCredentials(account.KeyId, account.SecretKey, ""),
+		})
+		if err != nil {
+			err = errors.Wrapf(err, "failed to create session from static creds")
+			return stack, err
+		}
+	}
+
+	output, err := sts.New(awsSession).GetCallerIdentity(&sts.GetCallerIdentityInput{})
 	if err != nil {
 		err = errors.Wrapf(err, "Error getting caller identity")
 		return stack, err
 	}
 
-	account := *output.Account
+	log.Debugf("getting stack from account %s", *output.Account)
 
-	cfstatus, err := s.Status()
+	stack, err = NewStack(&config, awsSession, false)
 	if err != nil {
-		err = errors.Wrapf(err, "failed getting status for stack %s", stackName)
+		err = errors.Wrapf(err, "failed creating stack object")
 		return stack, err
 	}
 
-	ctime, err := s.Created()
+	return stack, err
+}
+
+func (s *OpsServer) DeleteStack(accountNumber string, stackName string) (err error) {
+	stack, err := s.GetStack(accountNumber, stackName)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to generate stack for account %s name %s", accountNumber, stackName)
+		return err
+	}
+
+	err = stack.Delete()
+
+	return err
+}
+
+func (s *OpsServer) GetInstances() (instances []OnpremDetails, err error) {
+	instances = make([]OnpremDetails, 0)
+
+	for _, account := range s.Accounts {
+		log.Debugf("Getting stacks for %s", account.Number)
+		stack, err := s.GetStack(account.Number, "")
+		if err != nil {
+			err = errors.Wrapf(err, "failed to generate stack for account %s", account.Number)
+			return instances, err
+		}
+
+		stacklist, err := stack.ListStacks()
+		if err != nil {
+			err = errors.Wrapf(err, "error listing stacks")
+			return instances, err
+		}
+
+		log.Debugf("%d instances for %s", len(stacklist), account.Number)
+
+		for _, stack := range stacklist {
+
+			display := OnpremDetails{
+				Name:    *stack.StackName,
+				Account: account.Number,
+			}
+
+			instances = append(instances, display)
+		}
+
+	}
+
+	return instances, err
+}
+
+func (s *OpsServer) GetDetails(accountNum string, stackName string) (deets OnpremDetails, err error) {
+	stack, err := s.GetStack(accountNum, stackName)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to generate stack for account %s name %s", accountNum, stackName)
+		return deets, err
+	}
+
+	cfstatus, err := stack.Status()
+	if err != nil {
+		err = errors.Wrapf(err, "failed getting status for stack %s", stackName)
+		return deets, err
+	}
+
+	ctime, err := stack.Created()
 	if err != nil {
 		err = errors.Wrapf(err, "failed getting creation time for %s", stackName)
 	}
 
-	outputs, err := s.Outputs()
+	outputs, err := stack.Outputs()
 	if err != nil {
 		err = errors.Wrapf(err, "failed getting outputs for %s", stackName)
-		return stack, err
+		return deets, err
 	}
 
 	var address string
@@ -267,8 +422,8 @@ func GetStack(stackName string) (stack DisplayStack, err error) {
 		kotsadm = fmt.Sprintf("http://%s:8800", address)
 	}
 
-	stack = DisplayStack{
-		Account:  account,
+	deets = OnpremDetails{
+		Account:  accountNum,
 		Name:     stackName,
 		CFStatus: cfstatus,
 		Address:  address,
@@ -279,24 +434,7 @@ func GetStack(stackName string) (stack DisplayStack, err error) {
 		Created:  ctime.String(),
 	}
 
-	return stack, err
-}
-
-type DisplayStack struct {
-	Account     string `json:"account" binding:"required"`
-	Kubernetes  string `json:"kubernetes" binding:"required"`
-	Kotsadm     string `json:"kotsadm" binding:"required"`
-	CFStatus    string `json:"cfstatus" binding:"required"`
-	Name        string `json:"name" binding:"required"`
-	Address     string `json:"address" binding:"required"`
-	Datastore   string `json:"datastore" binding:"required"`
-	EventStream string `json:"eventstream" binding:"required"`
-	Media       string `json:"media" binding:"required"`
-	Login       string `json:"login" binding:"required"`
-	Api         string `json:"api" binding:"required"`
-	CDN         string `json:"cdn" binding:"required"`
-	CA          string `json:"ca" binding:"required"`
-	Created     string `json:"created" binding:"required"`
+	return deets, err
 }
 
 func PingEndpoint(address string) (err error) {
