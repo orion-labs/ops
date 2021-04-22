@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -38,6 +39,7 @@ type OnpremDetails struct {
 	CDN         string `json:"cdn" binding:"required"`
 	CA          string `json:"ca" binding:"required"`
 	Created     string `json:"created" binding:"required"`
+	Uptime      string `json:"uptime" binding:"required"`
 }
 
 type Account struct {
@@ -422,6 +424,14 @@ func (s *OpsServer) GetDetails(accountNum string, stackName string) (deets Onpre
 		kotsadm = fmt.Sprintf("http://%s:8800", address)
 	}
 
+	dur := time.Now().Sub(*ctime)
+
+	uptime := dur.String()
+
+	// very crude formatting
+	uptime = strings.ReplaceAll(uptime, "h", "h ")
+	uptime = strings.ReplaceAll(uptime, "m", "m ")
+
 	deets = OnpremDetails{
 		Account:  accountNum,
 		Name:     stackName,
@@ -432,6 +442,7 @@ func (s *OpsServer) GetDetails(accountNum string, stackName string) (deets Onpre
 		Login:    login,
 		CA:       caHost,
 		Created:  ctime.String(),
+		Uptime:   uptime,
 	}
 
 	return deets, err

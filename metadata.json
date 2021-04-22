@@ -1,18 +1,18 @@
 {
   "name": "ops",
   "version": "3.5.0",
-  "package": "github.com/orion-labs/orion-ptt-system-ops",
+  "package": "github.com/orion-labs/ops",
   "description": "Easily manage Orion PTT System stacks via CloudFormation.",
   "repository": "https://orionlabs-dbt-tools.s3.us-east-1.amazonaws.com",
   "building": {
     "targets": [
       {
         "name": "darwin/amd64",
-        "ldflags": "-X github.com/orion-labs/orion-ptt-system-ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
+        "ldflags": "-X github.com/orion-labs/ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
       },
       {
         "name": "linux/amd64",
-        "ldflags": "-X github.com/orion-labs/orion-ptt-system-ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
+        "ldflags": "-X github.com/orion-labs/ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
       }
     ],
     "extras": [
