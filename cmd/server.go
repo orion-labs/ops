@@ -16,7 +16,7 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
+	"github.com/orion-labs/ops/pkg/ops"
 	"github.com/spf13/cobra"
 	"log"
 )

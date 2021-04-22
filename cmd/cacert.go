@@ -20,7 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/orion-labs/orion-ptt-system-ops/pkg/ops"
+	"github.com/orion-labs/ops/pkg/ops"
 	"github.com/spf13/cobra"
 	"io/ioutil"
 	"log"
