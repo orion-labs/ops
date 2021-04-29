@@ -121,6 +121,7 @@ class Stack extends React.Component {
                     </div>
                     <div className="panel-body">
                         Created: {this.state.stack.created}<br/>
+                        Uptime: {this.state.stack.uptime}<br/>
                         Address: {this.state.stack.address}<br/>
                         Account: {this.state.stack.account}<br/>
                         CloudFormation: {this.state.stack.cfstatus}<br/>
