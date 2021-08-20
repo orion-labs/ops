@@ -180,7 +180,7 @@ func TestStackCrud(t *testing.T) {
 				t.Errorf("Failed to create devenv object: %s", err)
 			}
 
-			err = s.Create()
+			err = s.Create(false)
 			if err != nil {
 				t.Errorf("Stack creation failed: %s", err)
 			}
