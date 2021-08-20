@@ -93,7 +93,7 @@ No different from calling 'create', followed by 'destroy', but it will read the 
 			log.Fatalf("failed destroying stack %s: %s", s.Config.StackName, err)
 		}
 
-		err = s.Create()
+		err = s.Create(stageOnly)
 		if err != nil {
 			log.Fatalf("failed creating stack %s: %s", s.Config.StackName, err)
 		}

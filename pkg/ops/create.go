@@ -20,7 +20,7 @@ const ERR_SSH_GENERAL = "SSH error.  Is your ssh-agent running?  Keys loaded?  C
 var TESTING bool
 
 // Create Instantiates an instance of the Orion PTT System in AWS via CloudFormation
-func (s *Stack) Create() (err error) {
+func (s *Stack) Create(stageOnly bool) (err error) {
 	exists := s.Exists()
 	if exists {
 		err = errors.New(fmt.Sprintf("Stack %s already exists.", s.Config.StackName))
@@ -148,17 +148,22 @@ func (s *Stack) Create() (err error) {
 
 	err = s.StageLicense(sshClient)
 	if err != nil {
-		//err = errors.Wrapf(err, "failed staging license file")
-		err = errors.New(ERR_SSH_GENERAL)
+		err = errors.Wrapf(err, "failed staging license file")
+		//err = errors.New(ERR_SSH_GENERAL)
 		return err
 	}
 
 	// Create and stage the config file.
 	err = s.StageConfig(sshClient)
 	if err != nil {
-		//err = errors.Wrapf(err, "failed staging kots config")
-		err = errors.New(ERR_SSH_GENERAL)
+		err = errors.Wrapf(err, "failed staging kots config")
+		//err = errors.New(ERR_SSH_GENERAL)
 		return err
+	}
+
+	// Exit early after staging files if told to do so
+	if stageOnly {
+		return
 	}
 
 	// Poll kotsadm console

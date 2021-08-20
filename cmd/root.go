@@ -24,6 +24,7 @@ var keyname string
 var configPath string
 var autoRollback bool
 var dryRun bool
+var stageOnly bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -52,4 +53,5 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "~/.orion-ptt-system.json", "path to config file")
 	rootCmd.PersistentFlags().BoolVarP(&autoRollback, "rollback", "r", true, "Automatically rollback if creation fails.")
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dryrun", "d", false, "dry run.  Prints Config info and exits.")
+	rootCmd.PersistentFlags().BoolVarP(&stageOnly, "stageonly", "s", false, "stage only.  Builds AWS resources, stages files, and then exits.")
 }

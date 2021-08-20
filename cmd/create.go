@@ -77,7 +77,7 @@ Requires an AWS account, and AWS API credentials with Administrator privileges.
 			os.Exit(0)
 		}
 
-		err = s.Create()
+		err = s.Create(stageOnly)
 		if err != nil {
 			log.Fatalf("Stack creation failed: %s", err)
 		}

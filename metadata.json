@@ -1,6 +1,6 @@
 {
   "name": "ops",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "package": "github.com/orion-labs/ops",
   "description": "Easily manage Orion PTT System stacks via CloudFormation.",
   "repository": "https://orionlabs-dbt-tools.s3.us-east-1.amazonaws.com",
