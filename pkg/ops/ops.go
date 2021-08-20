@@ -78,7 +78,6 @@ const CONFIG_FILE_TEMPLATE = `{
   "instance_type": "m5.2xlarge",
   "ami_name": "orion-base*",
   "config_template": "https://orion-ptt-system-templates.s3.us-east-1.amazonaws.com/orion-ptt-system.tmpl",
-  "shared_config": "https://orion-ptt-system-templates.s3.us-east-1.amazonaws.com/orion-ptt-system-shared-config.json"
 }
 `
 
@@ -110,12 +109,8 @@ type StackConfig struct {
 	ConfigTemplate  string `json:"config_template"`
 	KotsadmPassword string `json:"kotsadm_password"`
 	AMIName         string `json:"ami_name"`
-	SharedConfig    string `json:"shared_config"`
 	Beta            bool
-}
-
-type SharedConfig struct {
-	SubnetIDs []string `json:"subnet_ids"`
+	SubnetIDs       []string `json:"subnet_ids"`
 }
 
 // NewStack  Creates a new programmatic representation of a Stack.  Creates the object/interface.  Doesn't actually create it in AWS until you call Init().

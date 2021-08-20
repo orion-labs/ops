@@ -28,6 +28,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -42,10 +43,11 @@ var licensefile string
 var templatefile string
 var orionuser string
 var orionpassword string
-var sharedconfig string
 var vpc string
 var network string
 var ami string
+var subnetIds []string
+var skipCrud bool
 
 func TestMain(m *testing.M) {
 	setUp()
@@ -88,8 +90,12 @@ func setUp() {
 	orionAccount = os.Getenv("ORION_ACCOUNT")
 	network = os.Getenv("ORION_NETWORK")
 	ami = os.Getenv("ORION_AMI")
-
-	sharedconfig = os.Getenv("ORION_SHARED_CONFIG")
+	subnetEnv := os.Getenv("ORION_SUBNET_IDS")
+	subnetIds = strings.Split(subnetEnv, ",")
+	skip := os.Getenv("SKIP_CRUD")
+	if skip == "true" {
+		skipCrud = true
+	}
 }
 
 func tearDown() {
@@ -122,8 +128,8 @@ func TestListStacks(t *testing.T) {
 				KeyName:      "Nik",
 				DNSDomain:    dnsDomain,
 				InstanceType: instanceType,
-				SharedConfig: sharedconfig,
 				AMIName:      amiName,
+				SubnetIDs:    subnetIds,
 			},
 		},
 	}
@@ -151,6 +157,9 @@ func TestListStacks(t *testing.T) {
 }
 
 func TestStackCrud(t *testing.T) {
+	if skipCrud {
+		t.Skip("ENV SKIP_CRUD true.  Skipping CRUD test.\n")
+	}
 	stackName := fmt.Sprintf("opstest-%s", randSeq(8))
 	inputs := []struct {
 		name   string
@@ -167,8 +176,8 @@ func TestStackCrud(t *testing.T) {
 				ConfigTemplate:  templatefile,
 				Username:        orionuser,
 				KotsadmPassword: orionpassword,
-				SharedConfig:    sharedconfig,
 				AMIName:         amiName,
+				SubnetIDs:       subnetIds,
 			},
 		},
 	}
@@ -222,8 +231,8 @@ func TestCreateConfig(t *testing.T) {
 				Username:       orionuser,
 				LicenseFile:    licensefile,
 				ConfigTemplate: templatefile,
-				SharedConfig:   sharedconfig,
 				AMIName:        amiName,
+				SubnetIDs:      subnetIds,
 			},
 			`apiVersion: kots.io/v1beta1
 kind: ConfigValues
@@ -317,8 +326,8 @@ func TestCreateCFStackInput(t *testing.T) {
 				Username:       orionuser,
 				LicenseFile:    licensefile,
 				ConfigTemplate: templatefile,
-				SharedConfig:   sharedconfig,
 				AMIName:        amiName,
+				SubnetIDs:      subnetIds,
 			},
 			cloudformation.CreateStackInput{
 				Capabilities: []*string{aws.String("CAPABILITY_NAMED_IAM")},
@@ -378,8 +387,8 @@ func TestCreateCFStackInput(t *testing.T) {
 				Username:       orionuser,
 				LicenseFile:    licensefile,
 				ConfigTemplate: templatefile,
-				SharedConfig:   sharedConfigFile,
 				AMIName:        amiName,
+				SubnetIDs:      subnetIds,
 			},
 			cloudformation.CreateStackInput{
 				Capabilities: []*string{aws.String("CAPABILITY_NAMED_IAM")},
@@ -439,8 +448,8 @@ func TestCreateCFStackInput(t *testing.T) {
 				Username:       orionuser,
 				LicenseFile:    licensefile,
 				ConfigTemplate: templatefile,
-				SharedConfig:   os.Getenv("ORION_SHARED_CONFIG_URL"),
 				AMIName:        amiName,
+				SubnetIDs:      subnetIds,
 			},
 			cloudformation.CreateStackInput{
 				Capabilities: []*string{aws.String("CAPABILITY_NAMED_IAM")},
