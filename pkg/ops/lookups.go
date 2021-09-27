@@ -81,6 +81,7 @@ func (s *Stack) LookupAmiID() (id string, err error) {
 	return id, err
 }
 
+// LookupNetwork looks up VPC and subnetID based on allowable subnets supplied by config file.  Returns first match.  Basically a crude means of detecting which VPC we're running in.
 func (s *Stack) LookupNetwork() (vpcID string, subnetID string, err error) {
 	client := ec2.New(s.AwsSession)
 
@@ -95,6 +96,7 @@ func (s *Stack) LookupNetwork() (vpcID string, subnetID string, err error) {
 
 	possibleNetworks := s.Config.SubnetIDs
 
+	// loop over the subnets we see, return VPC and subnetID of first match.
 	for _, sn := range output.Subnets {
 		if StringInSlice(*sn.SubnetId, possibleNetworks) {
 			vpcID = *sn.VpcId
