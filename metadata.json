@@ -11,6 +11,10 @@
         "ldflags": "-X github.com/orion-labs/ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
       },
       {
+        "name": "darwin/arm64",
+        "ldflags": "-X github.com/orion-labs/ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
+      },
+      {
         "name": "linux/amd64",
         "ldflags": "-X github.com/orion-labs/ops/pkg/ops.orionAccount=${AWS_ACCOUNT}"
       }
@@ -39,6 +43,12 @@
       {
         "src": "ops_darwin_amd64",
         "dst": "{{.Repository}}/{{.Name}}/{{.Version}}/darwin/amd64/{{.Name}}",
+        "sig": true,
+        "checksums": true
+      },
+      {
+        "src": "ops_darwin_arm64",
+        "dst": "{{.Repository}}/{{.Name}}/{{.Version}}/darwin/arm64/{{.Name}}",
         "sig": true,
         "checksums": true
       },
